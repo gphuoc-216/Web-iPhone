@@ -170,4 +170,45 @@ class QuanLyKhuyenMaiCtrl
         $this->pdo->prepare("UPDATE KhuyenMai SET trangThai = ? WHERE maKhuyenMai = ?")->execute([$trangThai, $maKhuyenMai]);
         return ['thanhCong' => true, 'thongBao' => 'Cập nhật trạng thái khuyến mãi thành công', 'duLieu' => ['maKhuyenMai' => $maKhuyenMai, 'trangThai' => $trangThai]];
     }
+
+    // UC59: Xóa khuyến mãi (chặn nếu đang diễn ra; xóa bảng phụ DieuKienApDung & KhuyenMai_DienThoai trong transaction để tránh lỗi FK #1451)
+    public function xoaKhuyenMai(int $maKhuyenMai): array
+    {
+        if ($maKhuyenMai <= 0) {
+            return ['thanhCong' => false, 'thongBao' => 'Mã khuyến mãi không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        }
+
+        $stmt = $this->pdo->prepare("SELECT * FROM KhuyenMai WHERE maKhuyenMai = ? LIMIT 1");
+        $stmt->execute([$maKhuyenMai]);
+        $km = $stmt->fetch();
+        if (!$km) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy chương trình khuyến mãi', 'duLieu' => null, 'maHttp' => 404];
+        }
+
+        $homNay = date('Y-m-d');
+        if ($km['trangThai'] === 'Đang áp dụng' && $homNay >= $km['ngayBatDau'] && $homNay <= $km['ngayKetThuc']) {
+            return [
+                'thanhCong' => false,
+                'thongBao'  => 'Không thể xóa chương trình khuyến mãi đang diễn ra. Vui lòng chuyển sang Ngừng áp dụng trước khi xóa',
+                'duLieu'    => null,
+                'maHttp'    => 409,
+            ];
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            // Xóa bản ghi liên kết ở 2 bảng phụ trước để tránh lỗi khóa ngoại MySQL #1451
+            $this->pdo->prepare("DELETE FROM DieuKienApDung WHERE maKhuyenMai = ?")->execute([$maKhuyenMai]);
+            $this->pdo->prepare("DELETE FROM KhuyenMai_DienThoai WHERE maKhuyenMai = ?")->execute([$maKhuyenMai]);
+            $this->pdo->prepare("DELETE FROM KhuyenMai WHERE maKhuyenMai = ?")->execute([$maKhuyenMai]);
+            $this->pdo->commit();
+
+            return ['thanhCong' => true, 'thongBao' => 'Đã xóa chương trình khuyến mãi thành công', 'duLieu' => ['maKhuyenMai' => $maKhuyenMai]];
+        } catch (Throwable $ngoaiLe) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['thanhCong' => false, 'thongBao' => 'Không thể xóa chương trình khuyến mãi: ' . $ngoaiLe->getMessage(), 'duLieu' => null, 'maHttp' => 500];
+        }
+    }
 }

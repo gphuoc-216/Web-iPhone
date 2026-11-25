@@ -60,7 +60,7 @@ class ThongKeBaoCaoCtrl
             'tongDoanhThu'  => $tongDoanhThu,
             'tongGiaVon'    => $tongGiaVon,
             'tongLoiNhuan'  => $tongDoanhThu - $tongGiaVon,
-            'tongSoDonHang' => $tongDon,
+            'tongSoDon'     => $tongDon,
             'chiTiet'       => $chiTiet,
             'thoiDiemTao'   => date('Y-m-d H:i:s'),
         ]);
@@ -115,21 +115,35 @@ class ThongKeBaoCaoCtrl
         )->fetchAll();
 
         $tongDon = 0;
+        $soDonThanhCong = 0;
+        $soDonDaHuy = 0;
+        $soDonDangXuLy = 0;
         $chiTiet = [];
         foreach ($cacDong as $dong) {
-            $tongDon += (int)$dong['soLuong'];
+            $sl = (int)$dong['soLuong'];
+            $tongDon += $sl;
+            if ($dong['trangThai'] === 'Đã giao thành công') {
+                $soDonThanhCong += $sl;
+            } elseif ($dong['trangThai'] === 'Đã hủy') {
+                $soDonDaHuy += $sl;
+            } else {
+                $soDonDangXuLy += $sl;
+            }
             $chiTiet[] = [
                 'trangThai'  => $dong['trangThai'],
-                'soLuong'    => (int)$dong['soLuong'],
+                'soLuong'    => $sl,
                 'tongGiaTri' => (float)$dong['tongGiaTri'],
             ];
         }
 
         $baoCao = new BaoCao([
-            'loaiBaoCao'    => 'Đơn hàng theo trạng thái',
-            'tongSoDonHang' => $tongDon,
-            'chiTiet'       => $chiTiet,
-            'thoiDiemTao'   => date('Y-m-d H:i:s'),
+            'loaiBaoCao'     => 'Đơn hàng theo trạng thái',
+            'tongSoDon'      => $tongDon,
+            'soDonThanhCong' => $soDonThanhCong,
+            'soDonDaHuy'     => $soDonDaHuy,
+            'soDonDangXuLy'  => $soDonDangXuLy,
+            'chiTiet'        => $chiTiet,
+            'thoiDiemTao'    => date('Y-m-d H:i:s'),
         ]);
 
         return ['thanhCong' => true, 'thongBao' => 'Thống kê đơn hàng theo trạng thái thành công', 'duLieu' => $baoCao->chuyenThanhMang()];

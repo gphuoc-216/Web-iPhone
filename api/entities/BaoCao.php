@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: BaoCao (Thực thể tổng hợp tạm cho Thống kê - Báo cáo)
+// Entity BCE: BaoCao (Thực thể tổng hợp tạm cho Thống kê - Báo cáo, chuẩn Lan04)
 
 class BaoCao
 {
@@ -11,7 +11,10 @@ class BaoCao
     public float $tongDoanhThu = 0.0;
     public float $tongGiaVon = 0.0;
     public float $tongLoiNhuan = 0.0;
-    public int $tongSoDonHang = 0;
+    public int $tongSoDon = 0;
+    public int $soDonThanhCong = 0;
+    public int $soDonDaHuy = 0;
+    public int $soDonDangXuLy = 0;
     public array $chiTiet = [];
     public ?string $thoiDiemTao = null;
 
@@ -35,8 +38,17 @@ class BaoCao
         if (array_key_exists('tongLoiNhuan', $duLieu)) {
             $this->tongLoiNhuan = (float)($duLieu['tongLoiNhuan'] ?? 0.0);
         }
-        if (array_key_exists('tongSoDonHang', $duLieu)) {
-            $this->tongSoDonHang = (int)($duLieu['tongSoDonHang'] ?? 0);
+        if (array_key_exists('tongSoDon', $duLieu)) {
+            $this->tongSoDon = (int)($duLieu['tongSoDon'] ?? 0);
+        }
+        if (array_key_exists('soDonThanhCong', $duLieu)) {
+            $this->soDonThanhCong = (int)($duLieu['soDonThanhCong'] ?? 0);
+        }
+        if (array_key_exists('soDonDaHuy', $duLieu)) {
+            $this->soDonDaHuy = (int)($duLieu['soDonDaHuy'] ?? 0);
+        }
+        if (array_key_exists('soDonDangXuLy', $duLieu)) {
+            $this->soDonDangXuLy = (int)($duLieu['soDonDangXuLy'] ?? 0);
         }
         if (array_key_exists('chiTiet', $duLieu)) {
             $this->chiTiet = is_array($duLieu['chiTiet'] ?? null) ? $duLieu['chiTiet'] : [];
@@ -54,15 +66,18 @@ class BaoCao
     public function chuyenThanhMang(): array
     {
         return [
-            'loaiBaoCao' => $this->loaiBaoCao,
-            'tuNgay' => $this->tuNgay,
-            'denNgay' => $this->denNgay,
-            'tongDoanhThu' => $this->tongDoanhThu,
-            'tongGiaVon' => $this->tongGiaVon,
-            'tongLoiNhuan' => $this->tongLoiNhuan,
-            'tongSoDonHang' => $this->tongSoDonHang,
-            'chiTiet' => $this->chiTiet,
-            'thoiDiemTao' => $this->thoiDiemTao,
+            'loaiBaoCao'     => $this->loaiBaoCao,
+            'tuNgay'         => $this->tuNgay,
+            'denNgay'        => $this->denNgay,
+            'tongDoanhThu'   => $this->tongDoanhThu,
+            'tongGiaVon'     => $this->tongGiaVon,
+            'tongLoiNhuan'   => $this->tongLoiNhuan,
+            'tongSoDon'      => $this->tongSoDon,
+            'soDonThanhCong' => $this->soDonThanhCong,
+            'soDonDaHuy'     => $this->soDonDaHuy,
+            'soDonDangXuLy'  => $this->soDonDangXuLy,
+            'chiTiet'        => $this->chiTiet,
+            'thoiDiemTao'    => $this->thoiDiemTao,
         ];
     }
 }

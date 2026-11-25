@@ -767,7 +767,10 @@
               <strong>${dc.nguoiNhan}</strong> (${dc.soDienThoai}) ${dc.macDinh ? '<span style="color:#16a34a; font-weight:700;">★ Mặc định</span>' : ''}
               <div class="chu-phu">${dc.diaChi} · ${dc.khuVuc}</div>
             </div>
-            <button class="nut nut-do nut-nho" data-xoa-dc="${dc.maDiaChi}">Xóa</button>
+            <div style="display:flex; gap:6px;">
+              ${!dc.macDinh ? `<button class="nut nut-phu nut-nho" data-md-dc="${dc.maDiaChi}">Đặt mặc định</button>` : ''}
+              <button class="nut nut-do nut-nho" data-xoa-dc="${dc.maDiaChi}">Xóa</button>
+            </div>
           </div>
         `).join('')}
         <form id="f-dc" style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
@@ -781,6 +784,13 @@
           <button type="submit" class="nut nut-chinh">Thêm địa chỉ</button>
         </form>
       `;
+      vung.querySelectorAll('[data-md-dc]').forEach(b => {
+        b.onclick = async () => {
+          const r = await goiApi('ho-so/dia-chi', { method: 'PUT', body: JSON.stringify({ maDiaChi: Number(b.dataset.mdDc), macDinh: true }) });
+          hienToast(r.thongBao, r.thanhCong);
+          moModalHoSo('dia-chi');
+        };
+      });
       vung.querySelectorAll('[data-xoa-dc]').forEach(b => {
         b.onclick = async () => {
           const r = await goiApi('ho-so/dia-chi?maDiaChi=' + b.dataset.xoaDc, { method: 'DELETE' });

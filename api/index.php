@@ -466,6 +466,9 @@ try {
             if ($phuongThuc === 'PATCH') {
                 traKetQuaController($ctrl->capNhatTrangThaiKhuyenMai((int)($duLieu['maKhuyenMai'] ?? 0), (string)($duLieu['trangThai'] ?? 'Ngừng áp dụng')));
             }
+            if ($phuongThuc === 'DELETE') {
+                traKetQuaController($ctrl->xoaKhuyenMai((int)($_GET['maKhuyenMai'] ?? $duLieu['maKhuyenMai'] ?? 0)));
+            }
             break;
 
         // 18. QuanLyVoucherCtrl (UC60 - UC64) — Ban Quản lý

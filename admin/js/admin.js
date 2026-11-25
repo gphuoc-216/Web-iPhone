@@ -211,7 +211,7 @@
       <div class="luoi-the">
         <div class="the-chi-so"><div class="nhan">Tổng doanh thu (UC53)</div><div class="gia-tri">${dinhDangTien(duLieuDt.tongDoanhThu)}</div></div>
         <div class="the-chi-so"><div class="nhan">Tổng lợi nhuận ước tính</div><div class="gia-tri" style="color:#16a34a;">${dinhDangTien(duLieuDt.tongLoiNhuan)}</div></div>
-        <div class="the-chi-so"><div class="nhan">Tổng số đơn hàng (UC54)</div><div class="gia-tri">${(dh.duLieu && dh.duLieu.tongSoDonHang) || 0}</div></div>
+        <div class="the-chi-so"><div class="nhan">Tổng số đơn hàng (UC54)</div><div class="gia-tri">${(dh.duLieu && dh.duLieu.tongSoDon) || 0}</div><div class="chu-phu">Thành công: ${(dh.duLieu && dh.duLieu.soDonThanhCong) || 0} · Xử lý: ${(dh.duLieu && dh.duLieu.soDonDangXuLy) || 0} · Hủy: ${(dh.duLieu && dh.duLieu.soDonDaHuy) || 0}</div></div>
         <div class="the-chi-so"><div class="nhan">Mặt hàng cần cảnh báo kho (UC56)</div><div class="gia-tri" style="color:#dc2626;">${chiTietTk.length}</div></div>
       </div>
 
@@ -332,6 +332,7 @@
                 <td>${sp.tonKho.tonThucTe} / ${sp.tonKho.giuCho} / <strong>${sp.tonKho.tonKhaDung}</strong></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(sp.trangThai)}">${sp.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
+                  <button class="nut nut-phu nut-nho" data-sua-dt="${sp.maDienThoai}">Sửa (UC5)</button>
                   ${sp.trangThai === 'Ngừng kinh doanh'
                     ? `<button class="nut nut-thanh-cong nut-nho" data-kp-dt="${sp.maDienThoai}">Khôi phục (UC10)</button>`
                     : `<button class="nut nut-nguy-hiem nut-nho" data-xoa-dt="${sp.maDienThoai}">Xóa (UC6)</button>`}
@@ -344,6 +345,9 @@
     `;
 
     document.getElementById('btn-them-dt').onclick = moFormThemDienThoai;
+    document.querySelectorAll('[data-sua-dt]').forEach(b => {
+      b.onclick = () => moFormSuaDienThoai(ds.find(x => x.maDienThoai == b.dataset.suaDt));
+    });
     document.querySelectorAll('[data-xoa-dt]').forEach(b => {
       b.onclick = async () => {
         if (!confirm('Xác nhận xóa điện thoại này?')) return;
@@ -393,6 +397,47 @@
       const file = document.getElementById('dt-anh').files[0];
       if (file) fd.append('hinhAnh', file);
       const r = await goiApi('dien-thoai', { method: 'POST', body: fd });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) { dongModal(); renderDienThoai(); }
+    };
+  }
+
+  function moFormSuaDienThoai(sp) {
+    if (!sp) return;
+    const ts = sp.thongSoKyThuat || {};
+    const optDm = trangThai.danhSachDanhMucCache.map(dm => `<option value="${dm.maDanhMuc}" ${dm.maDanhMuc == sp.maDanhMuc ? 'selected' : ''}>${dm.ten}</option>`).join('');
+    moModal('Cập nhật điện thoại (UC5)', `
+      <form id="form-sua-dt">
+        <div class="nhom-nhap"><label>Tên điện thoại</label><input id="sdt-ten" required value="${sp.ten}" /></div>
+        <div class="luoi-2-cot">
+          <div class="nhom-nhap"><label>Danh mục</label><select id="sdt-dm">${optDm}</select></div>
+          <div class="nhom-nhap"><label>Hãng sản xuất</label><input id="sdt-hang" required value="${sp.hang}" /></div>
+        </div>
+        <div class="luoi-2-cot">
+          <div class="nhom-nhap"><label>Giá bán (VNĐ)</label><input id="sdt-gia" type="number" min="0" value="${sp.giaBan}" /></div>
+          <div class="nhom-nhap"><label>Mô tả</label><input id="sdt-mota" value="${sp.moTa || ''}" /></div>
+        </div>
+        <div class="luoi-2-cot">
+          <div class="nhom-nhap"><label>RAM (GB)</label><input id="sdt-ram" type="number" value="${ts.ram || 8}" /></div>
+          <div class="nhom-nhap"><label>ROM (GB)</label><input id="sdt-rom" type="number" value="${ts.rom || 128}" /></div>
+        </div>
+        <button type="submit" class="nut nut-chinh nut-rong">Lưu thay đổi</button>
+      </form>
+    `);
+    document.getElementById('form-sua-dt').onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await goiApi('dien-thoai', {
+        method: 'PUT',
+        body: JSON.stringify({
+          maDienThoai: sp.maDienThoai,
+          ten: document.getElementById('sdt-ten').value,
+          maDanhMuc: Number(document.getElementById('sdt-dm').value),
+          hang: document.getElementById('sdt-hang').value,
+          giaBan: Number(document.getElementById('sdt-gia').value),
+          moTa: document.getElementById('sdt-mota').value,
+          thongSoKyThuat: { ram: Number(document.getElementById('sdt-ram').value), rom: Number(document.getElementById('sdt-rom').value) },
+        }),
+      });
       hienThongBaoToast(r.thongBao, r.thanhCong);
       if (r.thanhCong) { dongModal(); renderDienThoai(); }
     };
@@ -743,32 +788,35 @@
           <button type="button" class="nut nut-chinh" id="btn-them-phi">+ Thêm quy tắc</button>
         </div>
         <table class="bang-du-lieu">
-          <thead><tr><th>Mã</th><th>Khu vực</th><th>Mức phí</th><th>Phí mặc định</th><th>Ngưỡng miễn phí</th></tr></thead>
-          <tbody>${ds.map(q => `<tr><td>#${q.maQuyTac}</td><td><strong>${q.khuVuc}</strong></td><td>${dinhDangTien(q.mucPhi)}</td><td>${dinhDangTien(q.mucPhiMacDinh)}</td><td>${dinhDangTien(q.nguongMienPhi)}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>Mã</th><th>Khu vực</th><th>Mức phí</th><th>Phí mặc định</th><th>Ngưỡng miễn phí</th><th>Thao tác</th></tr></thead>
+          <tbody>${ds.map(q => `<tr><td>#${q.maQuyTac}</td><td><strong>${q.khuVuc}</strong></td><td>${dinhDangTien(q.mucPhi)}</td><td>${dinhDangTien(q.mucPhiMacDinh)}</td><td>${dinhDangTien(q.nguongMienPhi)}</td><td><button class="nut nut-phu nut-nho" data-sua-phi="${q.maQuyTac}">Sửa</button></td></tr>`).join('')}</tbody>
         </table>
       </div>
     `;
-    document.getElementById('btn-them-phi').onclick = () => {
-      moModal('Thêm quy tắc phí vận chuyển (UC27)', `
+    function moFormPhi(qt = null) {
+      moModal(qt ? 'Cập nhật quy tắc phí vận chuyển (UC27)' : 'Thêm quy tắc phí vận chuyển (UC27)', `
         <form id="form-phi">
-          <div class="nhom-nhap"><label>Khu vực</label><input id="phi-kv" required /></div>
+          <div class="nhom-nhap"><label>Khu vực</label><input id="phi-kv" required value="${qt ? qt.khuVuc : ''}" /></div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Mức phí (VNĐ)</label><input id="phi-muc" type="number" min="0" value="30000" required /></div>
-            <div class="nhom-nhap"><label>Ngưỡng miễn phí (VNĐ)</label><input id="phi-mp" type="number" min="0" value="10000000" required /></div>
+            <div class="nhom-nhap"><label>Mức phí (VNĐ)</label><input id="phi-muc" type="number" min="0" value="${qt ? qt.mucPhi : 30000}" required /></div>
+            <div class="nhom-nhap"><label>Ngưỡng miễn phí (VNĐ)</label><input id="phi-mp" type="number" min="0" value="${qt ? qt.nguongMienPhi : 10000000}" required /></div>
           </div>
           <button type="submit" class="nut nut-chinh nut-rong">Lưu quy tắc</button>
         </form>
       `);
       document.getElementById('form-phi').onsubmit = async (e) => {
         e.preventDefault();
-        const r = await goiApi('phi-van-chuyen', {
-          method: 'POST',
-          body: JSON.stringify({ khuVuc: document.getElementById('phi-kv').value, mucPhi: Number(document.getElementById('phi-muc').value), nguongMienPhi: Number(document.getElementById('phi-mp').value) }),
-        });
+        const duLieu = { khuVuc: document.getElementById('phi-kv').value, mucPhi: Number(document.getElementById('phi-muc').value), nguongMienPhi: Number(document.getElementById('phi-mp').value) };
+        if (qt) duLieu.maQuyTac = qt.maQuyTac;
+        const r = await goiApi('phi-van-chuyen', { method: 'POST', body: JSON.stringify(duLieu) });
         hienThongBaoToast(r.thongBao, r.thanhCong);
         if (r.thanhCong) { dongModal(); renderPhiVanChuyen(); }
       };
-    };
+    }
+    document.getElementById('btn-them-phi').onclick = () => moFormPhi();
+    document.querySelectorAll('[data-sua-phi]').forEach(b => {
+      b.onclick = () => moFormPhi(ds.find(x => x.maQuyTac == b.dataset.suaPhi));
+    });
   }
 
   // ==================== 9. KHUYẾN MÃI & VOUCHER (UC57-64) ====================
@@ -777,7 +825,7 @@
     const ds = kq.duLieu || [];
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Chương trình Khuyến mãi (UC57 - UC59)</strong><button class="nut nut-chinh" id="btn-them-km">+ Tạo khuyến mãi</button></div>
+        <div class="thanh-cong-cu"><strong>Chương trình Khuyến mãi (UC57 - UC59)</strong><button class="nut nut-chinh" id="btn-them-km">+ Tạo khuyến mãi (UC57)</button></div>
         <table class="bang-du-lieu">
           <thead><tr><th>Mã</th><th>Tên chương trình</th><th>Ưu đãi</th><th>Thời gian</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
@@ -786,35 +834,43 @@
                 <td>#${km.maKhuyenMai}</td><td><strong>${km.ten}</strong><div class="chu-phu">${km.noiDung || ''}</div></td>
                 <td><strong>-${km.mucUuDai}%</strong></td><td>${km.ngayBatDau} → ${km.ngayKetThuc}</td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(km.trangThai)}">${km.trangThai}</span></td>
-                <td><button class="nut nut-phu nut-nho" data-doi-km="${km.maKhuyenMai}" data-tt="${km.trangThai === 'Đang áp dụng' ? 'Ngừng áp dụng' : 'Đang áp dụng'}">${km.trangThai === 'Đang áp dụng' ? 'Ngừng áp dụng' : 'Kích hoạt'}</button></td>
+                <td class="nhom-hanh-dong">
+                  <button class="nut nut-phu nut-nho" data-sua-km="${km.maKhuyenMai}">Sửa (UC58)</button>
+                  <button class="nut nut-canh-bao nut-nho" data-doi-km="${km.maKhuyenMai}" data-tt="${km.trangThai === 'Đang áp dụng' ? 'Ngừng áp dụng' : 'Đang áp dụng'}">${km.trangThai === 'Đang áp dụng' ? 'Ngừng' : 'Bật'}</button>
+                  <button class="nut nut-nguy-hiem nut-nho" data-xoa-km="${km.maKhuyenMai}">Xóa (UC59)</button>
+                </td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
     `;
-    document.getElementById('btn-them-km').onclick = () => {
-      moModal('Tạo chương trình khuyến mãi (UC57)', `
+    function moFormKm(km = null) {
+      moModal(km ? 'Cập nhật chương trình khuyến mãi (UC58)' : 'Tạo chương trình khuyến mãi (UC57)', `
         <form id="form-km">
-          <div class="nhom-nhap"><label>Tên chương trình</label><input id="km-ten" required /></div>
-          <div class="nhom-nhap"><label>Mức ưu đãi (%)</label><input id="km-ud" type="number" min="1" max="100" value="10" required /></div>
+          <div class="nhom-nhap"><label>Tên chương trình</label><input id="km-ten" required value="${km ? km.ten : ''}" /></div>
+          <div class="nhom-nhap"><label>Nội dung mô tả</label><input id="km-nd" value="${km ? (km.noiDung || '') : ''}" /></div>
+          <div class="nhom-nhap"><label>Mức ưu đãi (%)</label><input id="km-ud" type="number" min="1" max="100" value="${km ? km.mucUuDai : 10}" required /></div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Ngày bắt đầu</label><input id="km-bd" type="date" value="${new Date().toISOString().slice(0, 10)}" required /></div>
-            <div class="nhom-nhap"><label>Ngày kết thúc</label><input id="km-kt" type="date" value="${new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)}" required /></div>
+            <div class="nhom-nhap"><label>Ngày bắt đầu</label><input id="km-bd" type="date" value="${km ? km.ngayBatDau : new Date().toISOString().slice(0, 10)}" required /></div>
+            <div class="nhom-nhap"><label>Ngày kết thúc</label><input id="km-kt" type="date" value="${km ? km.ngayKetThuc : new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)}" required /></div>
           </div>
-          <button type="submit" class="nut nut-chinh nut-rong">Tạo khuyến mãi</button>
+          <button type="submit" class="nut nut-chinh nut-rong">Lưu khuyến mãi</button>
         </form>
       `);
       document.getElementById('form-km').onsubmit = async (e) => {
         e.preventDefault();
-        const r = await goiApi('khuyen-mai', {
-          method: 'POST',
-          body: JSON.stringify({ ten: document.getElementById('km-ten').value, mucUuDai: Number(document.getElementById('km-ud').value), ngayBatDau: document.getElementById('km-bd').value, ngayKetThuc: document.getElementById('km-kt').value }),
-        });
+        const duLieu = { ten: document.getElementById('km-ten').value, noiDung: document.getElementById('km-nd').value, mucUuDai: Number(document.getElementById('km-ud').value), ngayBatDau: document.getElementById('km-bd').value, ngayKetThuc: document.getElementById('km-kt').value };
+        if (km) duLieu.maKhuyenMai = km.maKhuyenMai;
+        const r = await goiApi('khuyen-mai', { method: km ? 'PUT' : 'POST', body: JSON.stringify(duLieu) });
         hienThongBaoToast(r.thongBao, r.thanhCong);
         if (r.thanhCong) { dongModal(); renderKhuyenMai(); }
       };
-    };
+    }
+    document.getElementById('btn-them-km').onclick = () => moFormKm();
+    document.querySelectorAll('[data-sua-km]').forEach(b => {
+      b.onclick = () => moFormKm(ds.find(x => x.maKhuyenMai == b.dataset.suaKm));
+    });
     document.querySelectorAll('[data-doi-km]').forEach(b => {
       b.onclick = async () => {
         const r = await goiApi('khuyen-mai', { method: 'PATCH', body: JSON.stringify({ maKhuyenMai: Number(b.dataset.doiKm), trangThai: b.dataset.tt }) });
@@ -822,14 +878,31 @@
         if (r.thanhCong) renderKhuyenMai();
       };
     });
+    document.querySelectorAll('[data-xoa-km]').forEach(b => {
+      b.onclick = async () => {
+        if (!confirm('Xác nhận xóa chương trình khuyến mãi này (UC59)?')) return;
+        const r = await goiApi('khuyen-mai?maKhuyenMai=' + b.dataset.xoaKm, { method: 'DELETE' });
+        hienThongBaoToast(r.thongBao, r.thanhCong);
+        if (r.thanhCong) renderKhuyenMai();
+      };
+    });
   }
 
-  async function renderVoucher() {
+  async function renderVoucher(tuKhoa = '') {
     const kq = await goiApi('voucher');
-    const ds = kq.duLieu || [];
+    const tatCa = kq.duLieu || [];
+    const tk = tuKhoa.trim().toLowerCase();
+    const ds = tk ? tatCa.filter(v => v.maVoucher.toLowerCase().includes(tk) || v.trangThai.toLowerCase().includes(tk)) : tatCa;
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Quản lý Mã giảm giá / Voucher (UC60 - UC64)</strong><button class="nut nut-chinh" id="btn-them-vc">+ Tạo Voucher</button></div>
+        <div class="thanh-cong-cu">
+          <strong>Quản lý Mã giảm giá / Voucher (UC60 - UC64)</strong>
+          <div style="display:flex; gap:8px;">
+            <input id="tim-vc" value="${tuKhoa}" placeholder="Tra cứu mã voucher (UC61)..." style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
+            <button type="button" class="nut nut-phu" id="btn-tim-vc">Tìm</button>
+            <button type="button" class="nut nut-chinh" id="btn-them-vc">+ Tạo Voucher (UC60)</button>
+          </div>
+        </div>
         <table class="bang-du-lieu">
           <thead><tr><th>Mã Voucher</th><th>Loại & Giá trị</th><th>Lượt dùng / Tổng</th><th>Hiệu lực</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
@@ -841,44 +914,50 @@
                 <td>${v.ngayBatDau} → ${v.ngayKetThuc}</td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(v.trangThai)}">${v.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
+                  <button class="nut nut-phu nut-nho" data-sua-vc="${v.maVoucher}">Sửa (UC62)</button>
                   <button class="nut nut-canh-bao nut-nho" data-khoa-vc="${v.maVoucher}" data-tt="${v.trangThai === 'Đã khóa' ? 'Đang hiệu lực' : 'Đã khóa'}">${v.trangThai === 'Đã khóa' ? 'Mở khóa' : 'Khóa (UC63)'}</button>
                   <button class="nut nut-nguy-hiem nut-nho" data-xoa-vc="${v.maVoucher}">Xóa (UC64)</button>
                 </td>
               </tr>
-            `).join('')}
+            `).join('') || '<tr><td colspan="6" class="rong">Không tìm thấy voucher phù hợp</td></tr>'}
           </tbody>
         </table>
       </div>
     `;
-    document.getElementById('btn-them-vc').onclick = () => {
-      moModal('Tạo mã Voucher mới (UC60)', `
+    document.getElementById('btn-tim-vc').onclick = () => renderVoucher(document.getElementById('tim-vc').value);
+    function moFormVc(v = null) {
+      moModal(v ? `Cập nhật Voucher ${v.maVoucher} (UC62)` : 'Tạo mã Voucher mới (UC60)', `
         <form id="form-vc">
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Mã Voucher</label><input id="vc-ma" required placeholder="VD: TET2027" /></div>
-            <div class="nhom-nhap"><label>Loại giảm</label><select id="vc-loai"><option value="Số tiền">Số tiền</option><option value="Phần trăm">Phần trăm</option></select></div>
+            <div class="nhom-nhap"><label>Mã Voucher</label><input id="vc-ma" required value="${v ? v.maVoucher : ''}" ${v ? 'readonly' : ''} placeholder="VD: TET2027" /></div>
+            <div class="nhom-nhap"><label>Loại giảm</label><select id="vc-loai"><option value="Số tiền" ${v && v.loaiGiam === 'Số tiền' ? 'selected' : ''}>Số tiền</option><option value="Phần trăm" ${v && v.loaiGiam === 'Phần trăm' ? 'selected' : ''}>Phần trăm</option></select></div>
           </div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Giá trị giảm</label><input id="vc-gt" type="number" min="1" value="500000" required /></div>
-            <div class="nhom-nhap"><label>Số lượng phát hành</label><input id="vc-sl" type="number" min="1" value="100" required /></div>
+            <div class="nhom-nhap"><label>Giá trị giảm</label><input id="vc-gt" type="number" min="1" value="${v ? v.giaTriGiam : 500000}" required /></div>
+            <div class="nhom-nhap"><label>Số lượng phát hành</label><input id="vc-sl" type="number" min="1" value="${v ? v.soLuong : 100}" required /></div>
           </div>
-          <button type="submit" class="nut nut-chinh nut-rong">Tạo Voucher</button>
+          <button type="submit" class="nut nut-chinh nut-rong">Lưu Voucher</button>
         </form>
       `);
       document.getElementById('form-vc').onsubmit = async (e) => {
         e.preventDefault();
         const r = await goiApi('voucher', {
-          method: 'POST',
+          method: v ? 'PUT' : 'POST',
           body: JSON.stringify({ maVoucher: document.getElementById('vc-ma').value, loaiGiam: document.getElementById('vc-loai').value, giaTriGiam: Number(document.getElementById('vc-gt').value), soLuong: Number(document.getElementById('vc-sl').value) }),
         });
         hienThongBaoToast(r.thongBao, r.thanhCong);
         if (r.thanhCong) { dongModal(); renderVoucher(); }
       };
-    };
+    }
+    document.getElementById('btn-them-vc').onclick = () => moFormVc();
+    document.querySelectorAll('[data-sua-vc]').forEach(b => {
+      b.onclick = () => moFormVc(tatCa.find(x => x.maVoucher === b.dataset.suaVc));
+    });
     document.querySelectorAll('[data-khoa-vc]').forEach(b => {
       b.onclick = async () => {
         const r = await goiApi('voucher', { method: 'PATCH', body: JSON.stringify({ maVoucher: b.dataset.khoaVc, trangThai: b.dataset.tt }) });
         hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderVoucher();
+        if (r.thanhCong) renderVoucher(tuKhoa);
       };
     });
     document.querySelectorAll('[data-xoa-vc]').forEach(b => {
@@ -886,18 +965,27 @@
         if (!confirm('Xóa voucher này (chỉ thành công khi chưa có lượt dùng)?')) return;
         const r = await goiApi('voucher?maVoucher=' + encodeURIComponent(b.dataset.xoaVc), { method: 'DELETE' });
         hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderVoucher();
+        if (r.thanhCong) renderVoucher(tuKhoa);
       };
     });
   }
 
   // ==================== 10. QUẢN LÝ TÀI KHOẢN (UC48-52) ====================
-  async function renderTaiKhoan() {
+  async function renderTaiKhoan(tuKhoa = '') {
     const kq = await goiApi('tai-khoan');
-    const ds = kq.duLieu || [];
+    const tatCa = kq.duLieu || [];
+    const kw = tuKhoa.trim().toLowerCase();
+    const ds = kw ? tatCa.filter(t => (t.dinhDanh || '').toLowerCase().includes(kw) || (t.hoTen || '').toLowerCase().includes(kw) || (t.vaiTro || '').toLowerCase().includes(kw)) : tatCa;
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Danh sách Tài khoản (${ds.length})</strong><button class="nut nut-chinh" id="btn-tao-nv">+ Tạo tài khoản Nhân viên (UC51)</button></div>
+        <div class="thanh-cong-cu">
+          <strong>Danh sách Tài khoản (${ds.length})</strong>
+          <div style="display:flex; gap:8px;">
+            <input id="tim-tk" value="${tuKhoa}" placeholder="Tìm tài khoản (UC48)..." style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
+            <button type="button" class="nut nut-phu" id="btn-tim-tk">Tìm</button>
+            <button type="button" class="nut nut-chinh" id="btn-tao-nv">+ Tạo tài khoản Nhân viên (UC51)</button>
+          </div>
+        </div>
         <table class="bang-du-lieu">
           <thead><tr><th>Mã</th><th>Định danh</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
@@ -907,6 +995,7 @@
                 <td><span class="nhan-trang-thai tt-lam">${tk.vaiTro}</span></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(tk.trangThai)}">${tk.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
+                  ${tk.vaiTro !== 'Khách hàng' ? `<button class="nut nut-phu nut-nho" data-vaitro-tk="${tk.maTaiKhoan}">Đổi vai trò (UC52)</button>` : ''}
                   <button class="nut ${tk.trangThai === 'Hoạt động' ? 'nut-nguy-hiem' : 'nut-thanh-cong'} nut-nho" data-khoa-tk="${tk.maTaiKhoan}" data-hd="${tk.trangThai === 'Hoạt động' ? '1' : '0'}">${tk.trangThai === 'Hoạt động' ? 'Khóa (UC49)' : 'Mở khóa (UC50)'}</button>
                 </td>
               </tr>
@@ -915,6 +1004,30 @@
         </table>
       </div>
     `;
+    document.getElementById('btn-tim-tk').onclick = () => renderTaiKhoan(document.getElementById('tim-tk').value);
+    document.querySelectorAll('[data-vaitro-tk]').forEach(b => {
+      b.onclick = () => {
+        const tkObj = tatCa.find(x => x.maTaiKhoan == b.dataset.vaitroTk);
+        moModal(`Cập nhật vai trò tài khoản #${tkObj.maTaiKhoan} (UC52)`, `
+          <form id="form-vt">
+            <div class="nhom-nhap"><label>Chọn vai trò mới</label>
+              <select id="vt-moi">
+                <option value="Ban Quản lý" ${tkObj.vaiTro === 'Ban Quản lý' ? 'selected' : ''}>Ban Quản lý</option>
+                <option value="Nhân viên Kho" ${tkObj.vaiTro === 'Nhân viên Kho' ? 'selected' : ''}>Nhân viên Kho</option>
+                <option value="Nhân viên Bán hàng / CSKH" ${tkObj.vaiTro === 'Nhân viên Bán hàng / CSKH' ? 'selected' : ''}>Nhân viên Bán hàng / CSKH</option>
+              </select>
+            </div>
+            <button type="submit" class="nut nut-chinh nut-rong">Lưu vai trò mới</button>
+          </form>
+        `);
+        document.getElementById('form-vt').onsubmit = async (e) => {
+          e.preventDefault();
+          const r = await goiApi('tai-khoan/vai-tro', { method: 'PATCH', body: JSON.stringify({ maTaiKhoan: tkObj.maTaiKhoan, vaiTro: document.getElementById('vt-moi').value }) });
+          hienThongBaoToast(r.thongBao, r.thanhCong);
+          if (r.thanhCong) { dongModal(); renderTaiKhoan(tuKhoa); }
+        };
+      };
+    });
     document.getElementById('btn-tao-nv').onclick = () => {
       moModal('Tạo tài khoản Nhân viên (UC51)', `
         <form id="form-nv">
