@@ -1,0 +1,35 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 0. Ánh xạ ảnh cục bộ (/storage/, /shop-assets/, /img/, /uploads/) nếu file không nằm đúng vị trí tĩnh
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^(storage|shop-assets|img|uploads)/(.*)$ api/storage.php?path=$0 [L,QSA]
+
+  # 1. Tự động chuyển các request /api/xxx sang file .php tương ứng hoặc bộ định tuyến BCE api/index.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME}.php -f
+  RewriteRule ^api/([a-zA-Z0-9_-]+)$ api/$1.php [L,QSA]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^api/(.*)$ api/index.php?duongDan=$1 [L,QSA]
+
+  # 2. Định tuyến /admin về cổng quản trị BCE admin/index.html (cho phép file css/js trong admin/ chạy trực tiếp)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^admin(/.*)?$ admin/index.html [L]
+
+  # 3. Cho phép các file API và file tĩnh thực tế được truy cập trực tiếp (không ép HTTPS)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 4. Định tuyến các đường dẫn còn lại về index.html cho React SPA
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Cấu hình CORS cho dữ liệu JSON cục bộ
+<IfModule mod_headers.c>
+  <FilesMatch "\.(json)$">
+    Header set Access-Control-Allow-Origin "*"
+  </FilesMatch>
+</IfModule>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phone Store — Cổng Quản Trị Nội Bộ (BCE & RBAC)</title>
+  <link rel="stylesheet" href="/admin/css/admin.css" />
+</head>
+
+<body>
+  <!-- MÀN HÌNH ĐĂNG NHẬP NỘI BỘ (UC40, UC42) -->
+  <div id="man-hinh-dang-nhap" class="khung-dang-nhap">
+    <div class="the-dang-nhap">
+      <div class="tieu-de-dang-nhap">
+        <span class="huy-hieu-he-thong">HỆ THỐNG NỘI BỘ BCE</span>
+        <h1>Phone Store Admin</h1>
+        <p>Đăng nhập theo vai trò: Ban Quản lý · Nhân viên Kho · Bán hàng / CSKH</p>
+      </div>
+
+      <form id="form-dang-nhap" class="bieu-mau">
+        <div class="nhom-nhap">
+          <label for="nhap-dinh-danh">Định danh (Email / SĐT)</label>
+          <input id="nhap-dinh-danh" type="text" required placeholder="VD: admin@phonestore.vn" />
+        </div>
+        <div class="nhom-nhap">
+          <label for="nhap-mat-khau">Mật khẩu</label>
+          <input id="nhap-mat-khau" type="password" required placeholder="Nhập mật khẩu..." />
+        </div>
+        <div id="loi-dang-nhap" class="hop-loi an"></div>
+        <button type="submit" class="nut nut-chinh nut-rong">Đăng nhập hệ thống</button>
+        <div class="dong-lien-ket">
+          <button type="button" id="nut-mo-quen-mk" class="nut-chu">Quên mật khẩu? (UC42)</button>
+          <a href="/" class="nut-chu">← Về trang bán hàng</a>
+        </div>
+      </form>
+
+      <div class="goi-y-tai-khoan">
+        <div class="tieu-de-nho">Tài khoản thử nghiệm nhanh (Mật khẩu: <code>123456</code>)</div>
+        <div class="nhom-nut-nhanh">
+          <button type="button" class="nut-nhanh" data-tk="admin@phonestore.vn">Ban Quản lý</button>
+          <button type="button" class="nut-nhanh" data-tk="kho@phonestore.vn">Nhân viên Kho</button>
+          <button type="button" class="nut-nhanh" data-tk="banhang@phonestore.vn">Bán hàng / CSKH</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL QUÊN MẬT KHẨU (UC42) -->
+  <div id="modal-quen-mk" class="lop-phu an">
+    <div class="hop-modal">
+      <div class="dau-modal">
+        <h3>Khôi phục mật khẩu (UC42)</h3>
+        <button type="button" class="nut-dong" id="dong-modal-quen-mk">&times;</button>
+      </div>
+      <div class="than-modal">
+        <div class="nhom-nhap">
+          <label>Định danh tài khoản</label>
+          <input id="qmk-dinh-danh" type="text" placeholder="Email hoặc SĐT đăng nhập" />
+        </div>
+        <button type="button" id="qmk-gui-ma" class="nut nut-phu">1. Gửi mã xác thực</button>
+        <div id="qmk-buoc-2" class="an" style="margin-top:14px;">
+          <div id="qmk-thong-bao-ma" class="hop-thong-tin"></div>
+          <div class="nhom-nhap">
+            <label>Mã xác thực (6 số)</label>
+            <input id="qmk-ma-xac-thuc" type="text" placeholder="Nhập mã 6 số" />
+          </div>
+          <div class="nhom-nhap">
+            <label>Mật khẩu mới</label>
+            <input id="qmk-mat-khau-moi" type="password" placeholder="Tối thiểu 6 ký tự" />
+          </div>
+          <button type="button" id="qmk-dat-lai" class="nut nut-chinh nut-rong">2. Đặt lại mật khẩu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GIAO DIỆN CHÍNH QUẢN TRỊ (RBAC 3 ACTOR) -->
+  <div id="ung-dung-quan-tri" class="bo-cuc-chinh an">
+    <aside class="thanh-ben">
+      <div class="thuong-hieu">
+        <div class="logo-chu">PS</div>
+        <div>
+          <div class="ten-ung-dung">Phone Store</div>
+          <div class="phu-de-ung-dung" id="nhan-vai-tro-ben">Nội bộ BCE</div>
+        </div>
+      </div>
+      <nav id="menu-dieu-huong" class="menu-ben"></nav>
+      <div class="chan-thanh-ben">
+        <a href="/" class="nut nut-phu nut-rong" style="text-align:center; text-decoration:none; margin-bottom:8px;">Trang bán hàng</a>
+        <button type="button" id="nut-dang-xuat" class="nut nut-nguy-hiem nut-rong">Đăng xuất (UC41)</button>
+      </div>
+    </aside>
+
+    <div class="vung-noi-dung">
+      <header class="thanh-tren">
+        <div>
+          <h2 id="tieu-de-man-hinh">Tổng quan</h2>
+          <span id="mo-ta-man-hinh" class="chu-phu">Hệ thống quản lý bán điện thoại</span>
+        </div>
+        <div class="cum-phai">
+          <!-- Hộp thông báo thời gian thực (ThongBao) -->
+          <div class="khung-thong-bao">
+            <button type="button" id="nut-chuong-tb" class="nut-chuong" title="Hộp thông báo">
+              🔔 <span id="so-tb-chua-doc" class="cham-dem an">0</span>
+            </button>
+            <div id="hop-thong-bao" class="danh-sach-tb an">
+              <div class="dau-hop-tb">
+                <strong>Thông báo nội bộ</strong>
+                <button type="button" id="nut-doc-tat-ca" class="nut-chu">Đánh dấu đã đọc</button>
+              </div>
+              <div id="noi-dung-tb" class="than-hop-tb">
+                <div class="rong">Không có thông báo mới</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="thong-tin-nguoi-dung">
+            <div id="ten-nguoi-dung" class="ten-nd">Quản trị viên</div>
+            <div id="huy-hieu-vai-tro" class="vai-tro-nd">Ban Quản lý</div>
+          </div>
+        </div>
+      </header>
+
+      <div id="thanh-phan-hoi" class="thanh-toast an"></div>
+      <main id="khung-man-hinh" class="noi-dung-chinh"></main>
+    </div>
+  </div>
+
+  <!-- MODAL DÙNG CHUNG CHO FORM THÊM / SỬA -->
+  <div id="modal-chung" class="lop-phu an">
+    <div class="hop-modal hop-modal-rong">
+      <div class="dau-modal">
+        <h3 id="tieu-de-modal-chung">Biểu mẫu</h3>
+        <button type="button" class="nut-dong" id="dong-modal-chung">&times;</button>
+      </div>
+      <div id="than-modal-chung" class="than-modal"></div>
+    </div>
+  </div>
+
+  <script src="/admin/js/admin.js"></script>
+</body>
+
+</html>

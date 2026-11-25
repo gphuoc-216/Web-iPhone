@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phone Store — Hệ thống Bán Điện Thoại Chính Hãng (BCE)</title>
+  <script src="/config.js"></script>
+  <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/custom.css" />
+</head>
+
+<body>
+  <!-- HEADER -->
+  <header class="dau-trang">
+    <div class="khung-chua thanh-dieu-huong">
+      <a href="/" class="logo-thuong-hieu" id="nut-ve-trang-chu">
+        <span class="bieu-tuong-logo">📱</span>
+        <span>Phone<strong>Store</strong></span>
+      </a>
+
+      <form id="form-tim-kiem" class="o-tim-kiem">
+        <input id="nhap-tu-khoa" type="search" placeholder="Tìm iPhone, Samsung, Xiaomi, chip Snapdragon..." />
+        <button type="submit">Tìm kiếm</button>
+      </form>
+
+      <div class="cum-hanh-dong">
+        <button type="button" id="nut-mo-gio-hang" class="nut-header">
+          🛒 Giỏ hàng <span id="dem-gio-hang" class="cham-so">0</span>
+        </button>
+        <div id="vung-tai-khoan" class="vung-tk">
+          <button type="button" id="nut-mo-dang-nhap" class="nut nut-chinh">Đăng nhập / Đăng ký</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BANNER HERO -->
+  <section class="banner-chinh">
+    <div class="khung-chua noi-dung-banner">
+      <div>
+        <span class="nhan-banner">CHÍNH HÃNG 100% · BẢO HÀNH 12 THÁNG</span>
+        <h1>Điện thoại cao cấp — Giá tốt mỗi ngày</h1>
+        <p>Tự động áp dụng khuyến mãi theo sản phẩm, hỗ trợ mã giảm giá, tính phí vận chuyển theo khu vực và theo dõi
+          đơn hàng theo thời gian thực.</p>
+      </div>
+      <div class="nut-danh-muc-nhanh" id="thanh-danh-muc"></div>
+    </div>
+  </section>
+
+  <!-- BỘ LỌC ĐA ĐIỀU KIỆN (UC8) -->
+  <section class="khung-chua">
+    <div class="thanh-bo-loc">
+      <select id="loc-hang">
+        <option value="">Tất cả hãng</option>
+        <option value="Apple">Apple</option>
+        <option value="Samsung">Samsung</option>
+        <option value="Xiaomi">Xiaomi</option>
+        <option value="OPPO">OPPO</option>
+      </select>
+      <input id="loc-gia-tu" type="number" min="0" step="1000000" placeholder="Giá từ (VNĐ)" />
+      <input id="loc-gia-den" type="number" min="0" step="1000000" placeholder="Giá đến (VNĐ)" />
+      <select id="loc-ram">
+        <option value="">Tất cả RAM</option>
+        <option value="4">4 GB</option>
+        <option value="6">6 GB</option>
+        <option value="8">8 GB</option>
+        <option value="12">12 GB</option>
+        <option value="16">16 GB</option>
+      </select>
+      <select id="loc-rom">
+        <option value="">Tất cả ROM</option>
+        <option value="64">64 GB</option>
+        <option value="128">128 GB</option>
+        <option value="256">256 GB</option>
+        <option value="512">512 GB</option>
+        <option value="1024">1 TB</option>
+      </select>
+      <select id="loc-pin">
+        <option value="">Dung lượng pin</option>
+        <option value="3000">Từ 3.000 mAh</option>
+        <option value="4000">Từ 4.000 mAh</option>
+        <option value="4500">Từ 4.500 mAh</option>
+        <option value="5000">Từ 5.000 mAh</option>
+      </select>
+      <select id="loc-sap-xep">
+        <option value="moiNhat">Mới nhất</option>
+        <option value="giaTangDan">Giá tăng dần</option>
+        <option value="giaGiamDan">Giá giảm dần</option>
+      </select>
+      <button type="button" id="nut-ap-dung-loc" class="nut nut-chinh">Lọc</button>
+      <button type="button" id="nut-xoa-loc" class="nut nut-phu">Đặt lại</button>
+    </div>
+
+    <div id="thanh-thong-bao-web" class="toast-web an"></div>
+
+    <!-- DANH SÁCH SẢN PHẨM -->
+    <div class="tieu-de-muc">
+      <h2 id="tieu-de-danh-sach">Danh sách điện thoại đang kinh doanh</h2>
+      <span id="tong-so-san-pham" class="chu-phu"></span>
+    </div>
+    <div id="luoi-san-pham" class="luoi-san-pham"></div>
+  </section>
+
+  <!-- MODAL DÙNG CHUNG (CHI TIẾT SP / GIỎ HÀNG / ĐẶT HÀNG / TÀI KHOẢN / XÁC THỰC) -->
+  <div id="modal-web" class="lop-phu an">
+    <div class="hop-modal" id="hop-modal-web">
+      <div class="dau-modal">
+        <h3 id="tieu-de-modal-web">Thông tin</h3>
+        <button type="button" id="dong-modal-web" class="nut-dong">&times;</button>
+      </div>
+      <div id="than-modal-web" class="than-modal"></div>
+    </div>
+  </div>
+
+  <footer class="chan-trang">
+    <div class="khung-chua">
+      <strong>Phone Store</strong> — Hệ thống bán điện thoại theo kiến trúc BCE (30 bảng RDM · Localhost) · <a
+        href="/admin">Cổng Quản trị Nội bộ</a>
+    </div>
+  </footer>
+
+  <script src="/assets/main.js"></script>
+  <script src="/custom.js"></script>
+</body>
+
+</html>

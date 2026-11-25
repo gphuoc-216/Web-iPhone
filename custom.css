@@ -1,0 +1,6 @@
+/* Bổ sung tùy chỉnh nhẹ cho giao diện Phone Store BCE */
+.vung-tk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
