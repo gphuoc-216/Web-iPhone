@@ -109,6 +109,12 @@ class QuanLyKhuyenMaiCtrl
 
     public function capNhatTrangThaiKhuyenMai(int $maKhuyenMai, string $trangThai): array
     {
+        if (!in_array($trangThai, ['Đang áp dụng', 'Ngừng áp dụng'], true)) {
+            return ['thanhCong' => false, 'thongBao' => 'Trạng thái khuyến mãi không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        }
+        if (!KhuyenMai::timTheoMa($maKhuyenMai, $this->pdo)) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy chương trình khuyến mãi', 'duLieu' => null, 'maHttp' => 404];
+        }
         KhuyenMai::capNhatTrangThai($maKhuyenMai, $trangThai, $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Cập nhật trạng thái khuyến mãi thành công', 'duLieu' => ['maKhuyenMai' => $maKhuyenMai, 'trangThai' => $trangThai]];
     }

@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: ThongSoKyThuat — Bảng ThongSoKyThuat
+// Entity BCE: ThongSoKyThuat — Bảng ThongSoKyThuat (Mục 3.4.3.27: Bảng 129, Bảng 130; RDM: Bảng 167)
 
 class ThongSoKyThuat
 {
@@ -49,10 +49,7 @@ class ThongSoKyThuat
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
-        }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -75,15 +72,15 @@ class ThongSoKyThuat
     public function chuyenThanhMang(): array
     {
         return [
-            'maThongSo' => $this->maThongSo,
-            'maDienThoai' => $this->maDienThoai,
-            'manHinh' => $this->manHinh,
-            'chip' => $this->chip,
-            'ram' => $this->ram,
-            'rom' => $this->rom,
-            'camera' => $this->camera,
+            'maThongSo'    => $this->maThongSo,
+            'maDienThoai'  => $this->maDienThoai,
+            'manHinh'      => $this->manHinh,
+            'chip'         => $this->chip,
+            'ram'          => $this->ram,
+            'rom'          => $this->rom,
+            'camera'       => $this->camera,
             'dungLuongPin' => $this->dungLuongPin,
-            'heDieuHanh' => $this->heDieuHanh,
+            'heDieuHanh'   => $this->heDieuHanh,
         ];
     }
 
@@ -92,6 +89,7 @@ class ThongSoKyThuat
         return $pdo ?? layKetNoiCsdl(true);
     }
 
+    // [UC5, UC9 - Hình 13, Hình 17] ThongSoKyThuat::timTheoDienThoai(maDienThoai) — Bảng 130 STT 4
     public static function timTheoDienThoai(int $maDienThoai, ?PDO $pdo = null): ?self
     {
         $stmt = self::pdo($pdo)->prepare("SELECT * FROM ThongSoKyThuat WHERE maDienThoai = ? LIMIT 1");
@@ -100,6 +98,7 @@ class ThongSoKyThuat
         return $row ? self::tuMang($row) : null;
     }
 
+    // [UC8 - Hình 16] ThongSoKyThuat::locTheoThongSo(ram, rom, dungLuongPin) — Bảng 130 STT 2, Bảng 231 dòng 7
     public static function locTheoThongSo(?int $ram, ?int $rom, ?int $dungLuongPin, ?PDO $pdo = null): array
     {
         $dk = ['1=1'];
@@ -107,13 +106,15 @@ class ThongSoKyThuat
         if ($ram !== null && $ram > 0) { $dk[] = "ram = ?"; $ts[] = $ram; }
         if ($rom !== null && $rom > 0) { $dk[] = "rom = ?"; $ts[] = $rom; }
         if ($dungLuongPin !== null && $dungLuongPin > 0) { $dk[] = "dungLuongPin >= ?"; $ts[] = $dungLuongPin; }
-        $stmt = self::pdo($pdo)->prepare("SELECT * FROM ThongSoKyThuat WHERE " . implode(' AND ', $dk));
+        $stmt = self::pdo($pdo)->prepare("SELECT maDienThoai FROM ThongSoKyThuat WHERE " . implode(' AND ', $dk));
         $stmt->execute($ts);
-        return array_map(fn($r) => self::tuMang($r)->chuyenThanhMang(), $stmt->fetchAll());
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
-    public static function luu(int $maDienThoai, array $thongSo, ?PDO $pdo = null): int
+    // [UC4 - Hình 12] ThongSoKyThuat::luu(maDienThoai, thongSo) — Bảng 130 STT 3, Bảng 231 dòng 4
+    public static function luu(int $maDienThoai, $thongSo, ?PDO $pdo = null): int
     {
+        $ts = ($thongSo instanceof self) ? $thongSo->chuyenThanhMang() : (is_array($thongSo) ? $thongSo : []);
         $db = self::pdo($pdo);
         $stmt = $db->prepare(
             "INSERT INTO ThongSoKyThuat (maDienThoai, manHinh, chip, ram, rom, camera, dungLuongPin, heDieuHanh)
@@ -121,19 +122,21 @@ class ThongSoKyThuat
         );
         $stmt->execute([
             $maDienThoai,
-            $thongSo['manHinh'] ?? '6.3 inches OLED',
-            $thongSo['chip'] ?? 'Đang cập nhật',
-            max(1, (int)($thongSo['ram'] ?? 8)),
-            max(1, (int)($thongSo['rom'] ?? 128)),
-            $thongSo['camera'] ?? '48MP',
-            max(1, (int)($thongSo['dungLuongPin'] ?? 4500)),
-            $thongSo['heDieuHanh'] ?? 'iOS / Android',
+            trim((string)($ts['manHinh'] ?? '')) !== '' ? trim((string)$ts['manHinh']) : '6.3 inches OLED',
+            trim((string)($ts['chip'] ?? '')) !== '' ? trim((string)$ts['chip']) : 'Đang cập nhật',
+            max(1, (int)($ts['ram'] ?? 8)),
+            max(1, (int)($ts['rom'] ?? 128)),
+            trim((string)($ts['camera'] ?? '')) !== '' ? trim((string)$ts['camera']) : '48MP',
+            max(1, (int)($ts['dungLuongPin'] ?? 4500)),
+            trim((string)($ts['heDieuHanh'] ?? '')) !== '' ? trim((string)$ts['heDieuHanh']) : 'iOS / Android',
         ]);
         return (int)$db->lastInsertId();
     }
 
-    public static function capNhat(int $maDienThoai, array $thongSo, ?PDO $pdo = null): bool
+    // [UC5 - Hình 13] ThongSoKyThuat::capNhat(maDienThoai, thongSo) — Bảng 130 STT 1, Bảng 231 dòng 5
+    public static function capNhat(int $maDienThoai, $thongSo, ?PDO $pdo = null): bool
     {
+        $ts = ($thongSo instanceof self) ? $thongSo->chuyenThanhMang() : (is_array($thongSo) ? $thongSo : []);
         $stmt = self::pdo($pdo)->prepare(
             "UPDATE ThongSoKyThuat
              SET manHinh = COALESCE(?, manHinh),
@@ -146,20 +149,14 @@ class ThongSoKyThuat
              WHERE maDienThoai = ?"
         );
         return $stmt->execute([
-            $thongSo['manHinh'] ?? null,
-            $thongSo['chip'] ?? null,
-            isset($thongSo['ram']) && $thongSo['ram'] !== '' ? max(1, (int)$thongSo['ram']) : null,
-            isset($thongSo['rom']) && $thongSo['rom'] !== '' ? max(1, (int)$thongSo['rom']) : null,
-            $thongSo['camera'] ?? null,
-            isset($thongSo['dungLuongPin']) && $thongSo['dungLuongPin'] !== '' ? max(1, (int)$thongSo['dungLuongPin']) : null,
-            $thongSo['heDieuHanh'] ?? null,
+            isset($ts['manHinh']) && trim((string)$ts['manHinh']) !== '' ? trim((string)$ts['manHinh']) : null,
+            isset($ts['chip']) && trim((string)$ts['chip']) !== '' ? trim((string)$ts['chip']) : null,
+            isset($ts['ram']) && $ts['ram'] !== '' ? max(1, (int)$ts['ram']) : null,
+            isset($ts['rom']) && $ts['rom'] !== '' ? max(1, (int)$ts['rom']) : null,
+            isset($ts['camera']) && trim((string)$ts['camera']) !== '' ? trim((string)$ts['camera']) : null,
+            isset($ts['dungLuongPin']) && $ts['dungLuongPin'] !== '' ? max(1, (int)$ts['dungLuongPin']) : null,
+            isset($ts['heDieuHanh']) && trim((string)$ts['heDieuHanh']) !== '' ? trim((string)$ts['heDieuHanh']) : null,
             $maDienThoai,
         ]);
     }
-
-    public static function xoaTheoDienThoai(int $maDienThoai, ?PDO $pdo = null): bool
-    {
-        return self::pdo($pdo)->prepare("DELETE FROM ThongSoKyThuat WHERE maDienThoai = ?")->execute([$maDienThoai]);
-    }
-
 }

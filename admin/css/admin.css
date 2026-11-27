@@ -1,5 +1,5 @@
 :root {
-  --nen: #f1f5f9;
+  --nen: #f8fafc;
   --trang: #ffffff;
   --vien: #e2e8f0;
   --chu: #0f172a;
@@ -9,7 +9,7 @@
   --thanh-cong: #16a34a;
   --canh-bao: #d97706;
   --nguy-hiem: #dc2626;
-  --thanh-ben: #0f172a;
+  --thanh-ben: #ffffff;
 }
 
 * {
@@ -28,23 +28,24 @@ body {
   display: none !important;
 }
 
-/* Đăng nhập */
+/* Đăng nhập — Light Theme chuẩn Mục 3.6 */
 .khung-dang-nhap {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 55%, #e0f2fe 100%);
 }
 
 .the-dang-nhap {
   width: 100%;
   max-width: 440px;
   background: var(--trang);
+  border: 1px solid var(--vien);
   border-radius: 16px;
   padding: 28px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
 }
 
 .huy-hieu-he-thong {
@@ -61,6 +62,7 @@ body {
 .tieu-de-dang-nhap h1 {
   margin: 10px 0 4px;
   font-size: 24px;
+  color: var(--chu);
 }
 
 .tieu-de-dang-nhap p {
@@ -93,25 +95,29 @@ body {
   font-weight: 600;
   border: 1px solid var(--vien);
   background: #f8fafc;
+  color: var(--chu);
   border-radius: 8px;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
 .nut-nhanh:hover {
   border-color: var(--chinh);
+  background: #eff6ff;
   color: var(--chinh);
 }
 
-/* Bố cục chính */
+/* Bố cục chính — Light Sidebar chuẩn Mục 3.6 */
 .bo-cuc-chinh {
   display: flex;
   min-height: 100vh;
 }
 
 .thanh-ben {
-  width: 260px;
+  width: 264px;
   background: var(--thanh-ben);
-  color: #e2e8f0;
+  color: var(--chu);
+  border-right: 1px solid var(--vien);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -122,7 +128,7 @@ body {
   align-items: center;
   gap: 12px;
   padding: 20px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--vien);
 }
 
 .logo-chu {
@@ -140,12 +146,12 @@ body {
 .ten-ung-dung {
   font-weight: 700;
   font-size: 16px;
-  color: #fff;
+  color: var(--chu);
 }
 
 .phu-de-ung-dung {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: 11.5px;
+  color: var(--chu-phu);
 }
 
 .menu-ben {
@@ -160,32 +166,35 @@ body {
   width: 100%;
   text-align: left;
   padding: 10px 12px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: #cbd5e1;
+  color: #475569;
   font-weight: 500;
   font-size: 13.5px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .muc-menu:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: #f1f5f9;
+  color: var(--chu);
 }
 
 .muc-menu.dang-chon {
-  background: var(--chinh);
-  color: #fff;
-  font-weight: 600;
+  background: #eff6ff;
+  color: var(--chinh-dam);
+  border-color: #bfdbfe;
+  font-weight: 700;
 }
 
 .chan-thanh-ben {
   padding: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--vien);
+  background: #f8fafc;
 }
 
 /* Vùng nội dung */
@@ -273,7 +282,7 @@ body {
   background: var(--trang);
   border: 1px solid var(--vien);
   border-radius: 12px;
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
   z-index: 100;
   overflow: hidden;
   display: flex;
@@ -381,6 +390,18 @@ body {
   color: var(--chu-phu);
 }
 
+.bang-du-lieu tbody tr {
+  cursor: pointer;
+}
+
+.bang-du-lieu tbody tr:hover {
+  background: #f8fafc;
+}
+
+.bang-du-lieu tbody tr.dong-dang-chon {
+  background: #eff6ff;
+}
+
 .anh-nho {
   width: 42px;
   height: 42px;
@@ -411,6 +432,8 @@ body {
   border-radius: 8px;
   font-size: 13.5px;
   font-family: inherit;
+  background: #fff;
+  color: var(--chu);
 }
 
 .luoi-2-cot {
@@ -426,6 +449,11 @@ body {
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
+}
+
+.nut:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .nut-nho {
@@ -557,7 +585,7 @@ body {
 .lop-phu {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -571,6 +599,8 @@ body {
   max-width: 480px;
   max-height: 90vh;
   border-radius: 14px;
+  border: 1px solid var(--vien);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.16);
   overflow: hidden;
   display: flex;
   flex-direction: column;

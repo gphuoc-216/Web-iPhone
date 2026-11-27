@@ -115,11 +115,12 @@ body {
   font-weight: 700;
 }
 
-/* Banner */
+/* Banner — Light Blue / Modern Crisp */
 .banner-chinh {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%);
-  color: #fff;
-  padding: 32px 0;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 55%, #e0f2fe 100%);
+  color: var(--chu);
+  border-bottom: 1px solid var(--vien);
+  padding: 28px 0;
   margin-bottom: 20px;
 }
 
@@ -128,7 +129,9 @@ body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.7px;
-  background: rgba(255, 255, 255, 0.16);
+  color: var(--chinh-dam);
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -136,11 +139,12 @@ body {
 .noi-dung-banner h1 {
   margin: 10px 0 6px;
   font-size: 28px;
+  color: var(--chu);
 }
 
 .noi-dung-banner p {
   margin: 0 0 18px;
-  color: #cbd5e1;
+  color: #334155;
   max-width: 720px;
 }
 
@@ -153,16 +157,17 @@ body {
 .vien-danh-muc {
   padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  border: 1px solid #bfdbfe;
+  background: #ffffff;
+  color: #1e40af;
   font-weight: 600;
   cursor: pointer;
 }
 
 .vien-danh-muc.dang-chon {
-  background: #fff;
-  color: var(--chinh-dam);
+  background: var(--chinh);
+  border-color: var(--chinh);
+  color: #fff;
 }
 
 /* Bộ lọc */
@@ -389,7 +394,7 @@ body {
 .lop-phu {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.58);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -400,9 +405,11 @@ body {
 .hop-modal {
   background: #fff;
   width: 100%;
-  max-width: 780px;
+  max-width: 820px;
   max-height: 92vh;
   border-radius: 16px;
+  border: 1px solid var(--vien);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.16);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -462,12 +469,13 @@ body {
   border-radius: 8px;
   font-size: 13.5px;
   font-family: inherit;
+  background: #fff;
 }
 
 .bang-thong-so {
   width: 100%;
   border-collapse: collapse;
-  margin: 12px 0;
+  margin: 10px 0;
 }
 
 .bang-thong-so td,
@@ -476,6 +484,13 @@ body {
   border-bottom: 1px solid #f1f5f9;
   text-align: left;
   font-size: 13px;
+}
+
+.bang-thong-so thead th {
+  background: #f8fafc;
+  color: var(--chu-phu);
+  font-size: 12px;
+  text-transform: uppercase;
 }
 
 .tab-bar {
@@ -511,6 +526,33 @@ body {
 .buoc-don.hien-tai {
   background: #2563eb;
   color: #fff;
+}
+
+.hop-tom-tat-nhan-hang {
+  background: #f8fafc;
+  border: 1px solid var(--vien);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.nut-goi-y-tk {
+  display: inline-block;
+  padding: 5px 10px;
+  border: 1px solid var(--vien);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--chu);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nut-goi-y-tk:hover {
+  border-color: var(--chinh);
+  background: #eff6ff;
+  color: var(--chinh);
 }
 
 .chan-trang {

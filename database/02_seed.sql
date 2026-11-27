@@ -1,8 +1,10 @@
 -- ============================================================================
 -- 02_seed.sql
--- Dữ liệu mẫu chuẩn hóa từ phone_store_backup.sql + phone_store_fixed_patch.sql
--- Ánh xạ sang 30 bảng RDM mới (Nhóm 08)
+-- Dữ liệu mẫu chuẩn hóa đồng bộ Báo cáo Cuối kỳ v4 (Nhóm 08)
+-- Khớp 100% 30 bảng RDM đạt 3NF & 44 khóa ngoại (0 cột dẫn xuất vật lý)
 -- ============================================================================
+
+SET NAMES utf8mb4;
 
 USE quan_ly_ban_dien_thoai;
 
@@ -26,12 +28,11 @@ INSERT INTO CauHinhLoiNhuan (maCauHinh, phamVi, tyLe, ngayApDung, ghiChu) VALUES
 INSERT INTO LichSuCauHinhLoiNhuan (maCauHinh, phamVi, tyLe, ngayApDung, thoiDiemGhi) VALUES
   (1, 'Toàn bộ sản phẩm', 25.00, '2026-10-01', '2026-10-01 08:00:00');
 
-INSERT INTO CanhBaoTonKho (phamVi, nguongSom, nguongToiThieu, nguongToiDa) VALUES
-  ('Toàn bộ sản phẩm', 15, 5, 350);
+INSERT INTO CanhBaoTonKho (phamVi, nguongSom, nguongToiThieu, nguongToiDa, maDanhMuc, maDienThoai) VALUES
+  ('Toàn bộ sản phẩm', 15, 5, 350, NULL, NULL);
 
 -- ============================================================================
 -- 2. TÀI KHOẢN, NHÂN VIÊN, KHÁCH HÀNG & QUY TẮC PHÍ VẬN CHUYỂN
--- Mật khẩu mẫu (BCrypt) cho các tài khoản test bên dưới: 123456
 -- ============================================================================
 
 INSERT INTO TaiKhoan (maTaiKhoan, dinhDanh, matKhauDaBam, vaiTro, trangThai, lyDoKhoa) VALUES
@@ -58,14 +59,13 @@ INSERT INTO QuyTacPhiVanChuyen (maQuyTac, khuVuc, mucPhi, mucPhiMacDinh, nguongM
   (3, 'Tỉnh thành khác',    50000.00, 35000.00, 20000000.00);
 
 INSERT INTO DiaChiGiaoHang (maDiaChi, maKhachHang, nguoiNhan, soDienThoai, diaChi, maQuyTac, macDinh) VALUES
-  (1, 1, 'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM', 1, TRUE),
-  (2, 2, 'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM', 1, TRUE),
-  (3, 3, 'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM', 2, TRUE);
+  (1, 1, 'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM', 1, 1),
+  (2, 2, 'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM', 1, 1),
+  (3, 3, 'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM', 2, 1);
 
 -- ============================================================================
 -- 3. 38 SẢN PHẨM ĐIỆN THOẠI & THÔNG SỐ KỸ THUẬT
--- (Giữ nguyên đường dẫn img/... và áp dụng bản vá hãng/màn hình/ROM)
--- Giá vốn bình quân = giá bán / 1.25 (khớp tỷ lệ lợi nhuận 25%)
+-- (SP #23 để sẵn 'Ngừng kinh doanh' để demo nhanh UC10; danh mục OPPO #4 để trống để demo xóa UC3)
 -- ============================================================================
 
 INSERT INTO DienThoai (maDienThoai, ten, maDanhMuc, hang, moTa, hinhAnh, giaVonBinhQuan, giaBan, trangThai) VALUES
@@ -91,7 +91,7 @@ INSERT INTO DienThoai (maDienThoai, ten, maDanhMuc, hang, moTa, hinhAnh, giaVonB
   (20, 'iPhone 13 256GB | Chính hãng',           1, 'Apple',   'iPhone 13 256GB màn hình Super Retina XDR 6.1 inch',        'storage/shop-assets/img/ip13_blue.webp',                        15992000, 19990000, 'Đang kinh doanh'),
   (21, 'iPhone 13 mini 256GB | Chính hãng',      1, 'Apple',   'iPhone 13 mini 256GB thiết kế nhỏ gọn 5.4 inch',            'storage/shop-assets/img/ip13_blue.webp',                        15992000, 19990000, 'Đang kinh doanh'),
   (22, 'iPhone 11 128GB | Chính hãng',           1, 'Apple',   'iPhone 11 128GB màn hình Liquid Retina 6.1 inch',           'storage/shop-assets/img/2_242.jpg',                             15992000, 19990000, 'Đang kinh doanh'),
-  (23, 'iPhone 11 64GB | Chính hãng',            1, 'Apple',   'iPhone 11 64GB màn hình Liquid Retina 6.1 inch',            'storage/shop-assets/img/6_130.webp',                            15992000, 19990000, 'Đang kinh doanh'),
+  (23, 'iPhone 11 64GB | Chính hãng',            1, 'Apple',   'iPhone 11 64GB màn hình Liquid Retina 6.1 inch',            'storage/shop-assets/img/6_130.webp',                            15992000, 19990000, 'Ngừng kinh doanh'),
   (24, 'iPhone 12 256GB | Chính hãng',           1, 'Apple',   'iPhone 12 256GB màn hình OLED 6.1 inch, hỗ trợ 5G',         'storage/shop-assets/img/ip12_light.jpg',                        15992000, 19990000, 'Đang kinh doanh'),
   (25, 'iPhone 12 512GB | Chính hãng',           1, 'Apple',   'iPhone 12 512GB dung lượng lớn, hỗ trợ 5G',                 'storage/shop-assets/img/iphone12_green.webp',                   15992000, 19990000, 'Đang kinh doanh'),
   (26, 'iPhone 12 Pro Max 512GB | Chính hãng',   1, 'Apple',   'iPhone 12 Pro Max 512GB màn hình lớn 6.7 inch',             'storage/shop-assets/img/ip12_blue.webp',                        15992000, 19990000, 'Đang kinh doanh'),
@@ -149,52 +149,54 @@ INSERT INTO ThongSoKyThuat (maDienThoai, manHinh, chip, ram, rom, camera, dungLu
   (38, '6.4 inches Super AMOLED',     'Exynos 1380',              8,  128, 'Chụp Góc Rộng, Chụp Góc Siêu Rộng',     5000, 'Android 14 (One UI 6)');
 
 -- ============================================================================
--- 4. KHUYẾN MÃI, VOUCHER & ĐIỀU KIỆN ÁP DỤNG (HIỆU LỰC THÁNG 11-12/2026)
+-- 4. KHUYẾN MÃI, VOUCHER & ĐIỀU KIỆN ÁP DỤNG
 -- ============================================================================
 
 INSERT INTO KhuyenMai (maKhuyenMai, ten, noiDung, mucUuDai, ngayBatDau, ngayKetThuc, khungGio, trangThai) VALUES
-  (1, 'Ưu đãi cuối năm 2026', 'Giảm tự động 5% cho dòng iPhone 17 & Flagship Android', 5.00,  '2026-11-01', '2026-12-31', '00:00-23:59', 'Đang áp dụng'),
+  (1, 'Ưu đãi cuối năm 2026', 'Giảm tự động 5% cho dòng iPhone 17 & Flagship Android', 5.00,  '2026-01-01', '2027-12-31', '00:00-23:59', 'Đang áp dụng'),
   (2, 'Flash Sale cuối tuần', 'Giảm tự động 10% cho sản phẩm tầm trung',              10.00, '2026-12-01', '2026-12-15', '09:00-21:00', 'Ngừng áp dụng');
 
 INSERT INTO KhuyenMai_DienThoai (maKhuyenMai, maDienThoai) VALUES
   (1, 1), (1, 2), (1, 3), (1, 31), (1, 37);
 
 INSERT INTO Voucher (maVoucher, loaiGiam, giaTriGiam, soLuong, gioiHanSuDung, luotDaDung, ngayBatDau, ngayKetThuc, trangThai) VALUES
-  ('GIAM500K', 'Số tiền',   500000.00, 100, 2, 0, '2026-11-01', '2026-12-31', 'Đang hiệu lực'),
-  ('SALE5PT',  'Phần trăm',      5.00,  50, 1, 0, '2026-11-01', '2026-12-31', 'Đang hiệu lực');
+  ('GIAM500K', 'Số tiền',   500000.00, 100, 2, 0, '2026-01-01', '2027-12-31', 'Đang hiệu lực'),
+  ('SALE5PT',  'Phần trăm',      5.00,  50, 1, 0, '2026-01-01', '2027-12-31', 'Đang hiệu lực'),
+  ('VIP200K',  'Số tiền',   200000.00,  10, 1, 1, '2026-01-01', '2027-12-31', 'Đang hiệu lực');
 
 INSERT INTO DieuKienApDung (maKhuyenMai, maVoucher, giaTriToiThieu, nhomHang, doiTuong) VALUES
-  (1,    NULL,       0.00,        'Flagship',       'Tất cả khách hàng'),
-  (NULL, 'GIAM500K', 15000000.00, 'Tất cả',         'Khách hàng đã đăng nhập'),
-  (NULL, 'SALE5PT',  25000000.00, 'Apple',  'Khách hàng đã đăng nhập');
+  (1,    NULL,       0.00,        'Flagship', 'Tất cả khách hàng'),
+  (NULL, 'GIAM500K', 15000000.00, 'Tất cả',   'Khách hàng đã đăng nhập'),
+  (NULL, 'SALE5PT',  25000000.00, 'Apple',    'Khách hàng đã đăng nhập'),
+  (NULL, 'VIP200K',  10000000.00, 'Tất cả',   'Khách hàng đã đăng nhập');
 
 -- ============================================================================
--- 5. 20 PHIẾU NHẬP KHO ĐÃ DUYỆT (LẬP BỞI NHÂN VIÊN KHO maNhanVien = 3)
+-- 5. 21 PHIẾU NHẬP KHO (20 PHIẾU ĐÃ DUYỆT + 1 PHIẾU CHỜ DUYỆT #21 CHO UC13)
 -- ============================================================================
 
-INSERT INTO PhieuNhap (maPhieuNhap, nguonNhap, ngayNhap, trangThai, maNhanVien) VALUES
-  (1,  'Apple Việt Nam',   '2026-10-19', 'Đã duyệt', 3),
-  (2,  'Apple Việt Nam',   '2026-10-20', 'Đã duyệt', 3),
-  (3,  'Apple Việt Nam',   '2026-10-21', 'Đã duyệt', 3),
-  (4,  'Apple Việt Nam',   '2026-10-22', 'Đã duyệt', 3),
-  (5,  'Apple Việt Nam',   '2026-10-25', 'Đã duyệt', 3),
-  (6,  'Apple Việt Nam',   '2026-10-27', 'Đã duyệt', 3),
-  (7,  'Apple Việt Nam',   '2026-10-29', 'Đã duyệt', 3),
-  (8,  'Apple Việt Nam',   '2026-11-01', 'Đã duyệt', 3),
-  (9,  'Apple Việt Nam',   '2026-11-02', 'Đã duyệt', 3),
-  (10, 'Apple Việt Nam',   '2026-11-03', 'Đã duyệt', 3),
-  (11, 'Apple Việt Nam',   '2026-11-03', 'Đã duyệt', 3),
-  (12, 'Xiaomi Việt Nam',  '2026-11-04', 'Đã duyệt', 3),
-  (13, 'Xiaomi Việt Nam',  '2026-11-04', 'Đã duyệt', 3),
-  (14, 'Xiaomi Việt Nam',  '2026-11-05', 'Đã duyệt', 3),
-  (15, 'Samsung Việt Nam', '2026-11-06', 'Đã duyệt', 3),
-  (16, 'Samsung Việt Nam', '2026-11-07', 'Đã duyệt', 3),
-  (17, 'Xiaomi Việt Nam',  '2026-11-08', 'Đã duyệt', 3),
-  (18, 'Apple Việt Nam',   '2026-11-09', 'Đã duyệt', 3),
-  (19, 'Apple Việt Nam',   '2026-11-10', 'Đã duyệt', 3),
-  (20, 'Apple Việt Nam',   '2026-11-11', 'Đã duyệt', 3);
+INSERT INTO PhieuNhap (maPhieuNhap, nguonNhap, ngayNhap, trangThai, maNhanVien, lyDoTuChoi, maNguoiDuyet, ngayDuyet) VALUES
+  (1,  'Apple Việt Nam',   '2026-10-19', 'Đã duyệt',  3, NULL, 1, '2026-10-19 10:00:00'),
+  (2,  'Apple Việt Nam',   '2026-10-20', 'Đã duyệt',  3, NULL, 1, '2026-10-20 10:00:00'),
+  (3,  'Apple Việt Nam',   '2026-10-21', 'Đã duyệt',  3, NULL, 1, '2026-10-21 10:00:00'),
+  (4,  'Apple Việt Nam',   '2026-10-22', 'Đã duyệt',  3, NULL, 1, '2026-10-22 10:00:00'),
+  (5,  'Apple Việt Nam',   '2026-10-25', 'Đã duyệt',  3, NULL, 1, '2026-10-25 10:00:00'),
+  (6,  'Apple Việt Nam',   '2026-10-27', 'Đã duyệt',  3, NULL, 1, '2026-10-27 10:00:00'),
+  (7,  'Apple Việt Nam',   '2026-10-29', 'Đã duyệt',  3, NULL, 1, '2026-10-29 10:00:00'),
+  (8,  'Apple Việt Nam',   '2026-11-01', 'Đã duyệt',  3, NULL, 1, '2026-11-01 10:00:00'),
+  (9,  'Apple Việt Nam',   '2026-11-02', 'Đã duyệt',  3, NULL, 1, '2026-11-02 10:00:00'),
+  (10, 'Apple Việt Nam',   '2026-11-03', 'Đã duyệt',  3, NULL, 1, '2026-11-03 10:00:00'),
+  (11, 'Apple Việt Nam',   '2026-11-03', 'Đã duyệt',  3, NULL, 1, '2026-11-03 14:00:00'),
+  (12, 'Xiaomi Việt Nam',  '2026-11-04', 'Đã duyệt',  3, NULL, 1, '2026-11-04 10:00:00'),
+  (13, 'Xiaomi Việt Nam',  '2026-11-04', 'Đã duyệt',  3, NULL, 1, '2026-11-04 14:00:00'),
+  (14, 'Xiaomi Việt Nam',  '2026-11-05', 'Đã duyệt',  3, NULL, 1, '2026-11-05 10:00:00'),
+  (15, 'Samsung Việt Nam', '2026-11-06', 'Đã duyệt',  3, NULL, 1, '2026-11-06 10:00:00'),
+  (16, 'Samsung Việt Nam', '2026-11-07', 'Đã duyệt',  3, NULL, 1, '2026-11-07 10:00:00'),
+  (17, 'Xiaomi Việt Nam',  '2026-11-08', 'Đã duyệt',  3, NULL, 1, '2026-11-08 10:00:00'),
+  (18, 'Apple Việt Nam',   '2026-11-09', 'Đã duyệt',  3, NULL, 1, '2026-11-09 10:00:00'),
+  (19, 'Apple Việt Nam',   '2026-11-10', 'Đã duyệt',  3, NULL, 1, '2026-11-10 10:00:00'),
+  (20, 'Apple Việt Nam',   '2026-11-11', 'Đã duyệt',  3, NULL, 1, '2026-11-11 10:00:00'),
+  (21, 'Samsung Việt Nam', '2026-11-25', 'Chờ duyệt', 3, NULL, NULL, NULL);
 
--- Nạp chi tiết phiếu nhập (donGiaNhap lấy đúng từ DienThoai.giaVonBinhQuan)
 INSERT INTO ChiTietPhieuNhap (maPhieuNhap, maDienThoai, soLuong, donGiaNhap)
 SELECT src.maPhieuNhap, d.maDienThoai, src.soLuong, d.giaVonBinhQuan
 FROM (
@@ -223,64 +225,66 @@ FROM (
   SELECT 9,  23, 120 UNION ALL
   SELECT 9,  24, 100 UNION ALL
   SELECT 10, 25, 200 UNION ALL
-  SELECT 10, 1,  200 UNION ALL  -- Tổng SP 1 = 400 (> ngưỡng tối đa 350 để test cảnh báo vượt trần)
-  SELECT 10, 2,  180 UNION ALL  -- Tổng SP 2 = 360 (> ngưỡng tối đa 350)
-  SELECT 11, 25, 160 UNION ALL  -- Tổng SP 25 = 360+ (> ngưỡng tối đa 350)
+  SELECT 10, 1,  200 UNION ALL
+  SELECT 10, 2,  180 UNION ALL
+  SELECT 11, 25, 160 UNION ALL
   SELECT 11, 30, 5   UNION ALL
   SELECT 12, 31, 2   UNION ALL
   SELECT 12, 32, 120 UNION ALL
-  SELECT 13, 28, 8   UNION ALL  -- SP 28 = 8 (hàng sắp hết: 5 < 8 <= 15)
+  SELECT 13, 28, 8   UNION ALL
   SELECT 13, 33, 200 UNION ALL
-  SELECT 14, 34, 7   UNION ALL  -- SP 34 = 7 (hàng sắp hết)
+  SELECT 14, 34, 7   UNION ALL
   SELECT 14, 35, 150 UNION ALL
-  SELECT 15, 36, 3   UNION ALL  -- SP 36 = 3 (dưới ngưỡng tối thiểu <= 5)
+  SELECT 15, 36, 3   UNION ALL
   SELECT 15, 37, 100 UNION ALL
   SELECT 16, 38, 250 UNION ALL
-  SELECT 17, 29, 5   UNION ALL  -- SP 29 = 5 (dưới ngưỡng tối thiểu <= 5)
+  SELECT 17, 29, 5   UNION ALL
   SELECT 17, 31, 130 UNION ALL
-  SELECT 18, 27, 2   UNION ALL  -- SP 27 = 2 (dưới ngưỡng tối thiểu <= 5)
+  SELECT 18, 27, 2   UNION ALL
   SELECT 18, 30, 150 UNION ALL
-  SELECT 19, 26, 6   UNION ALL  -- SP 26 = 6 (hàng sắp hết)
+  SELECT 19, 26, 6   UNION ALL
   SELECT 19, 35, 2   UNION ALL
-  SELECT 20, 25, 1
+  SELECT 20, 25, 1   UNION ALL
+  SELECT 21, 38, 10
 ) AS src
 JOIN DienThoai d ON d.maDienThoai = src.maDienThoai;
 
 -- ============================================================================
--- 6. GIỎ HÀNG, 19 ĐƠN HÀNG, PHIẾU XUẤT, THANH TOÁN & YÊU CẦU HỦY
+-- 6. GIỎ HÀNG, 19 ĐƠN HÀNG (KÈM SNAPSHOT), PHIẾU XUẤT, THANH TOÁN & YÊU CẦU HỦY
 -- ============================================================================
 
-INSERT INTO GioHang (maGioHang, maKhachHang, maPhien, maVoucher, tongTamTinh, tienGiamGia, tongTien, trangThai) VALUES
-  (1, 1, 'SESS_KH01_ACTIVE', NULL, 37990000.00, 0.00, 37990000.00, 'Đang dùng'),
-  (2, 2, 'SESS_KH02_ACTIVE', NULL,        0.00, 0.00,        0.00, 'Đang dùng'),
-  (3, 3, 'SESS_KH03_ACTIVE', NULL,        0.00, 0.00,        0.00, 'Đang dùng');
+INSERT INTO GioHang (maGioHang, maKhachHang, maPhien, maVoucher, tienGiamGia, trangThai, maDiaChi, phiVanChuyen) VALUES
+  (1, 1, 'SESS_KH01_ACTIVE', NULL, 0.00, 'Đang dùng', 1, 0.00),
+  (2, 2, 'SESS_KH02_ACTIVE', NULL, 0.00, 'Đang dùng', 2, 0.00),
+  (3, 3, 'SESS_KH03_ACTIVE', NULL, 0.00, 'Đang dùng', 3, 0.00);
 
--- Thêm sẵn 1 sản phẩm trong giỏ của Khách hàng 1 để test nhanh giao diện Giỏ hàng
 INSERT INTO ChiTietGioHang (maGioHang, maDienThoai, soLuong, donGia) VALUES
-  (1, 1, 1, 37990000.00);
+  (1, 1, 1, 36090500.00);
 
-INSERT INTO DonHang (maDonHang, maKhachHang, maDiaChi, maVoucher, ngayDat, phiVanChuyen, tongTien, trangThai) VALUES
-  (1,  1, 1, NULL, '2026-10-24 09:30:00', 0.00, 0.00, 'Đã duyệt'),
-  (2,  2, 2, NULL, '2026-10-24 14:15:00', 0.00, 0.00, 'Đã duyệt'),
-  (3,  3, 3, NULL, '2026-10-25 10:00:00', 0.00, 0.00, 'Đã giao thành công'),
-  (4,  1, 1, NULL, '2026-10-26 11:20:00', 0.00, 0.00, 'Đã giao thành công'),
-  (5,  2, 2, NULL, '2026-10-27 16:45:00', 0.00, 0.00, 'Đã giao thành công'),
-  (6,  3, 3, NULL, '2026-10-28 08:50:00', 0.00, 0.00, 'Đã hủy'),
-  (7,  1, 1, NULL, '2026-11-01 09:10:00', 0.00, 0.00, 'Chờ duyệt'),
-  (8,  2, 2, NULL, '2026-11-02 10:30:00', 0.00, 0.00, 'Chờ duyệt'),
-  (9,  3, 3, NULL, '2026-11-03 13:00:00', 0.00, 0.00, 'Chờ duyệt'),
-  (10, 3, 3, NULL, '2026-11-05 15:20:00', 0.00, 0.00, 'Chờ duyệt'),
-  (11, 3, 3, NULL, '2026-11-07 11:40:00', 0.00, 0.00, 'Chờ duyệt'),
-  (12, 3, 3, NULL, '2026-11-10 14:05:00', 0.00, 0.00, 'Chờ duyệt'),
-  (13, 2, 2, NULL, '2026-11-12 09:50:00', 0.00, 0.00, 'Chờ duyệt'),
-  (14, 1, 1, NULL, '2026-11-14 16:10:00', 0.00, 0.00, 'Chờ duyệt'),
-  (15, 2, 2, NULL, '2026-11-16 17:30:00', 0.00, 0.00, 'Chờ duyệt'),
-  (16, 1, 1, NULL, '2026-11-18 10:15:00', 0.00, 0.00, 'Chờ duyệt'),
-  (17, 1, 1, NULL, '2026-11-20 12:45:00', 0.00, 0.00, 'Chờ duyệt'),
-  (18, 2, 2, NULL, '2026-11-22 18:00:00', 0.00, 0.00, 'Chờ duyệt'),
-  (19, 1, 1, NULL, '2026-11-24 09:00:00', 0.00, 0.00, 'Chờ duyệt');
+INSERT INTO DonHang (
+  maDonHang, maKhachHang, maDiaChi, maVoucher, ngayDat, phiVanChuyen, tongTien, trangThai,
+  tenNguoiNhan, sdtNguoiNhan, diaChiNhan, lyDoHuy, maNhanVienDuyet, ngayDuyet
+) VALUES
+  (1,  1, 1, NULL,      '2026-10-24 09:30:00', 0.00, 0.00, 'Đã duyệt',           'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, 2, '2026-10-24 10:00:00'),
+  (2,  2, 2, NULL,      '2026-10-24 14:15:00', 0.00, 0.00, 'Đã duyệt',           'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM',       NULL, 2, '2026-10-24 15:00:00'),
+  (3,  3, 3, NULL,      '2026-10-25 10:00:00', 0.00, 0.00, 'Đã giao thành công', 'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM',  NULL, 2, '2026-10-25 10:30:00'),
+  (4,  1, 1, 'VIP200K', '2026-10-26 11:20:00', 0.00, 0.00, 'Đã giao thành công', 'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, 2, '2026-10-26 11:45:00'),
+  (5,  2, 2, NULL,      '2026-10-27 16:45:00', 0.00, 0.00, 'Đã giao thành công', 'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM',       NULL, 2, '2026-10-27 17:15:00'),
+  (6,  3, 3, NULL,      '2026-10-28 08:50:00', 0.00, 0.00, 'Đã hủy',             'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM',  'Khách hàng thay đổi nhu cầu mua sắm trước khi xuất kho', 2, '2026-10-28 09:00:00'),
+  (7,  1, 1, NULL,      '2026-11-01 09:10:00', 0.00, 0.00, 'Chờ duyệt',          'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, NULL, NULL),
+  (8,  2, 2, NULL,      '2026-11-02 10:30:00', 0.00, 0.00, 'Chờ duyệt',          'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM',       NULL, NULL, NULL),
+  (9,  3, 3, NULL,      '2026-11-03 13:00:00', 0.00, 0.00, 'Chờ duyệt',          'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM',  NULL, NULL, NULL),
+  (10, 3, 3, NULL,      '2026-11-05 15:20:00', 0.00, 0.00, 'Chờ duyệt',          'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM',  NULL, NULL, NULL),
+  (11, 3, 3, NULL,      '2026-11-07 11:40:00', 0.00, 0.00, 'Chờ duyệt',          'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM',  NULL, NULL, NULL),
+  (12, 3, 3, NULL,      '2026-11-10 14:05:00', 0.00, 0.00, 'Chờ duyệt',          'Lê Văn C',     '0333444555', '789 Đường GHI, TP. Thủ Đức, TP.HCM',  NULL, NULL, NULL),
+  (13, 2, 2, NULL,      '2026-11-12 09:50:00', 0.00, 0.00, 'Chờ duyệt',          'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM',       NULL, NULL, NULL),
+  (14, 1, 1, NULL,      '2026-11-14 16:10:00', 0.00, 0.00, 'Chờ duyệt',          'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, NULL, NULL),
+  (15, 2, 2, NULL,      '2026-11-16 17:30:00', 0.00, 0.00, 'Chờ duyệt',          'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM',       NULL, NULL, NULL),
+  (16, 1, 1, NULL,      '2026-11-18 10:15:00', 0.00, 0.00, 'Chờ duyệt',          'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, NULL, NULL),
+  (17, 1, 1, NULL,      '2026-11-20 12:45:00', 0.00, 0.00, 'Chờ duyệt',          'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, NULL, NULL),
+  (18, 2, 2, NULL,      '2026-11-22 18:00:00', 0.00, 0.00, 'Chờ duyệt',          'Trần Thị B',   '0988765432', '456 Đường DEF, Quận 3, TP.HCM',       NULL, NULL, NULL),
+  (19, 1, 1, NULL,      '2026-11-24 09:00:00', 0.00, 0.00, 'Chờ duyệt',          'Nguyễn Văn A', '0909123456', '123 Đường ABC, Quận 1, TP.HCM',       NULL, NULL, NULL);
 
--- Nạp chi tiết đơn hàng từ dữ liệu cũ (lấy đơn giá đúng theo DienThoai.giaBan)
 INSERT INTO ChiTietDonHang (maDonHang, maDienThoai, soLuong, donGia)
 SELECT src.maDonHang, d.maDienThoai, src.soLuong, d.giaBan
 FROM (
@@ -307,27 +311,26 @@ FROM (
 ) AS src
 JOIN DienThoai d ON d.maDienThoai = src.maDienThoai;
 
--- Cập nhật chính xác tổng tiền đơn hàng = SUM(soLuong * donGia) + phiVanChuyen
 UPDATE DonHang dh
 JOIN (
   SELECT maDonHang, SUM(soLuong * donGia) AS tongHang
   FROM ChiTietDonHang
   GROUP BY maDonHang
 ) ct ON ct.maDonHang = dh.maDonHang
-SET dh.tongTien = ct.tongHang + dh.phiVanChuyen;
+SET dh.tongTien = ct.tongHang + dh.phiVanChuyen - CASE WHEN dh.maVoucher = 'VIP200K' THEN 200000.00 ELSE 0.00 END;
 
--- Tạo phiếu xuất kho cho 3 đơn đã giao thành công (#3, #4, #5)
-INSERT INTO PhieuXuat (maPhieuXuat, maDonHang, ngayLap, ghiChu, trangThai, maNhanVien) VALUES
-  (1, 3, '2026-10-25', 'Đã đóng gói và bàn giao vận chuyển', 'Đã xuất', 3),
-  (2, 4, '2026-10-26', 'Đã đóng gói và bàn giao vận chuyển', 'Đã xuất', 3),
-  (3, 5, '2026-10-27', 'Đã đóng gói và bàn giao vận chuyển', 'Đã xuất', 3);
+-- Tạo 3 phiếu xuất đã xác nhận (#1, #2, #3) + 1 phiếu xuất Nháp (#4 cho đơn #1 để test UC16)
+INSERT INTO PhieuXuat (maPhieuXuat, maDonHang, ngayLap, ghiChu, trangThai, maNhanVien, maNguoiXacNhan, thoiDiemXacNhan) VALUES
+  (1, 3, '2026-10-25', 'Đã đóng gói và bàn giao vận chuyển', 'Đã xuất', 3, 3, '2026-10-25 14:00:00'),
+  (2, 4, '2026-10-26', 'Đã đóng gói và bàn giao vận chuyển', 'Đã xuất', 3, 3, '2026-10-26 15:00:00'),
+  (3, 5, '2026-10-27', 'Đã đóng gói và bàn giao vận chuyển', 'Đã xuất', 3, 3, '2026-10-27 18:00:00'),
+  (4, 1, '2026-11-25', 'Phiếu xuất chờ xác nhận bàn giao shipper', 'Nháp', 3, NULL, NULL);
 
 INSERT INTO ChiTietPhieuXuat (maPhieuXuat, maDienThoai, soLuong)
 SELECT px.maPhieuXuat, ct.maDienThoai, ct.soLuong
 FROM PhieuXuat px
 JOIN ChiTietDonHang ct ON ct.maDonHang = px.maDonHang;
 
--- Tạo giao dịch thanh toán tương ứng cho 19 đơn hàng
 INSERT INTO ThanhToan (maGioHang, maDonHang, phuongThuc, soTien, soTienHoan, trangThai)
 SELECT
   dh.maKhachHang AS maGioHang,
@@ -345,21 +348,20 @@ SELECT
   END AS trangThai
 FROM DonHang dh;
 
--- Ghi nhận yêu cầu hủy cho đơn #6 đã hủy
-INSERT INTO YeuCauHuyDon (maDonHang, lyDo, ngayGui, trangThai) VALUES
-  (6, 'Khách hàng thay đổi nhu cầu mua sắm trước khi xuất kho', '2026-10-28 09:30:00', 'Đã xác nhận');
+-- Ghi nhận yêu cầu hủy đã xác nhận (#1 cho đơn #6) + 1 yêu cầu hủy chờ xử lý (#2 cho đơn #2 để test UC35/UC36)
+INSERT INTO YeuCauHuyDon (maYeuCau, maDonHang, lyDo, ngayGui, trangThai, lyDoTuChoi, maNhanVienXuLy, ngayXuLy) VALUES
+  (1, 6, 'Khách hàng thay đổi nhu cầu mua sắm trước khi xuất kho', '2026-10-28 09:30:00', 'Đã xác nhận', NULL, 2, '2026-10-28 10:00:00'),
+  (2, 2, 'Muốn đổi sang phiên bản dung lượng cao hơn',              '2026-11-25 09:00:00', 'Chờ xử lý',   NULL, NULL, NULL);
 
 -- ============================================================================
--- 7. TỰ ĐỘNG TÍNH & KHỞI TẠO BẢNG TonKho TỪ NHẬP - XUẤT - GIỮ CHỖ
+-- 7. TỰ ĐỘNG TÍNH & KHỞI TẠO BẢNG TonKho (3NF: chỉ lưu tonThucTe, giuCho)
 -- ============================================================================
 
-INSERT INTO TonKho (maDienThoai, maKho, tonThucTe, giuCho, tonKhaDung)
+INSERT INTO TonKho (maDienThoai, tonThucTe, giuCho)
 SELECT
   d.maDienThoai,
-  1 AS maKho,
   (COALESCE(nhap.tongNhap, 0) - COALESCE(xuat.tongXuat, 0)) AS tonThucTe,
-  COALESCE(giu.tongGiuCho, 0) AS giuCho,
-  (COALESCE(nhap.tongNhap, 0) - COALESCE(xuat.tongXuat, 0) - COALESCE(giu.tongGiuCho, 0)) AS tonKhaDung
+  COALESCE(giu.tongGiuCho, 0) AS giuCho
 FROM DienThoai d
 LEFT JOIN (
   SELECT ct.maDienThoai, SUM(ct.soLuong) AS tongNhap
@@ -383,39 +385,9 @@ LEFT JOIN (
   GROUP BY ct.maDienThoai
 ) giu ON giu.maDienThoai = d.maDienThoai;
 
--- Thêm 1 thông báo mẫu cho Ban Quản lý
 INSERT INTO ThongBao (maNguoiNhan, noiDung, thoiDiemTao, daDoc) VALUES
-  (1, 'Hệ thống đã khởi tạo dữ liệu mẫu thành công: 38 sản phẩm, 20 phiếu nhập, 19 đơn hàng.', CURRENT_TIMESTAMP, FALSE);
+  (1, 'Hệ thống đã khởi tạo dữ liệu mẫu chuẩn v4: 30 bảng, 44 khóa ngoại, 38 sản phẩm, 21 phiếu nhập, 19 đơn hàng.', CURRENT_TIMESTAMP, 0);
 
 COMMIT;
 
 SET SQL_SAFE_UPDATES = 1;
-
--- ============================================================================
--- 8. TRUY VẤN KIỂM TRA ĐỐI SOÁT SAU KHI NẠP DỮ LIỆU
--- ============================================================================
-
--- Kiểm tra tổng số bản ghi của các bảng chính
-SELECT 'DanhMuc' AS bang, COUNT(*) AS soBanGhi FROM DanhMuc
-UNION ALL SELECT 'DienThoai', COUNT(*) FROM DienThoai
-UNION ALL SELECT 'ThongSoKyThuat', COUNT(*) FROM ThongSoKyThuat
-UNION ALL SELECT 'TonKho', COUNT(*) FROM TonKho
-UNION ALL SELECT 'PhieuNhap', COUNT(*) FROM PhieuNhap
-UNION ALL SELECT 'PhieuXuat', COUNT(*) FROM PhieuXuat
-UNION ALL SELECT 'DonHang', COUNT(*) FROM DonHang
-UNION ALL SELECT 'ThanhToan', COUNT(*) FROM ThanhToan;
-
--- Kiểm tra các mặt hàng đang nằm trong diện cảnh báo tồn kho (test UC20 / UC56)
-SELECT d.maDienThoai, d.ten, tk.tonThucTe, tk.giuCho, tk.tonKhaDung
-FROM TonKho tk
-JOIN DienThoai d ON d.maDienThoai = tk.maDienThoai
-WHERE tk.tonKhaDung <= 15 OR tk.tonThucTe > 350
-ORDER BY tk.tonKhaDung ASC;
-
--- Kiểm tra tổng tiền đơn hàng phải khớp tổng chi tiết + phí vận chuyển (trả về 0 dòng là chuẩn)
-SELECT dh.maDonHang, dh.tongTien,
-       COALESCE(SUM(ct.soLuong * ct.donGia), 0) + dh.phiVanChuyen AS tongTinhLai
-FROM DonHang dh
-LEFT JOIN ChiTietDonHang ct ON ct.maDonHang = dh.maDonHang
-GROUP BY dh.maDonHang, dh.tongTien, dh.phiVanChuyen
-HAVING dh.tongTien <> COALESCE(SUM(ct.soLuong * ct.donGia), 0) + dh.phiVanChuyen;

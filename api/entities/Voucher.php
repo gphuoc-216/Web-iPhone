@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: Voucher — Bảng Voucher
+// Entity BCE: Voucher — Bảng Voucher (Mục 3.4.3.29: Bảng 133, Bảng 134; RDM: Bảng 169)
 
 class Voucher
 {
@@ -49,10 +49,7 @@ class Voucher
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
-        }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -75,15 +72,15 @@ class Voucher
     public function chuyenThanhMang(): array
     {
         return [
-            'maVoucher' => $this->maVoucher,
-            'loaiGiam' => $this->loaiGiam,
-            'giaTriGiam' => $this->giaTriGiam,
-            'soLuong' => $this->soLuong,
+            'maVoucher'     => $this->maVoucher,
+            'loaiGiam'      => $this->loaiGiam,
+            'giaTriGiam'    => $this->giaTriGiam,
+            'soLuong'       => $this->soLuong,
             'gioiHanSuDung' => $this->gioiHanSuDung,
-            'luotDaDung' => $this->luotDaDung,
-            'ngayBatDau' => $this->ngayBatDau,
-            'ngayKetThuc' => $this->ngayKetThuc,
-            'trangThai' => $this->trangThai,
+            'luotDaDung'    => $this->luotDaDung,
+            'ngayBatDau'    => $this->ngayBatDau,
+            'ngayKetThuc'   => $this->ngayKetThuc,
+            'trangThai'     => $this->trangThai,
         ];
     }
 
@@ -92,8 +89,18 @@ class Voucher
         return $pdo ?? layKetNoiCsdl(true);
     }
 
-    public static function kiemTraHopLe(float $giaTriGiam, int $soLuong, int $gioiHanSuDung = 1, string $loaiGiam = 'Số tiền', string $ngayBatDau = '', string $ngayKetThuc = ''): bool
+    // [UC30, UC60, UC62 - Hình 38, Hình 68, Hình 70] Voucher::kiemTraHopLe(...) — Bảng 134 STT 5 & 6
+    // Nạp chồng:
+    // - 1 tham số chuỗi (UC30): kiemTraHopLe(maVoucher) kiểm tra mã tồn tại, đang hiệu lực, còn thời hạn, luotDaDung < soLuong
+    // - 3+ tham số số (UC60, UC62): kiemTraHopLe(giaTriGiam, soLuong, gioiHanSuDung, ...)
+    public static function kiemTraHopLe($maVoucherHoacGiaTriGiam, $soLuongHoacPdo = null, int $gioiHanSuDung = 1, string $loaiGiam = 'Số tiền', string $ngayBatDau = '', string $ngayKetThuc = ''): bool
     {
+        if (is_string($maVoucherHoacGiaTriGiam) && ($soLuongHoacPdo === null || $soLuongHoacPdo instanceof PDO)) {
+            return self::kiemTraMaHopLe($maVoucherHoacGiaTriGiam, $soLuongHoacPdo);
+        }
+
+        $giaTriGiam = (float)$maVoucherHoacGiaTriGiam;
+        $soLuong = (int)$soLuongHoacPdo;
         if (!in_array($loaiGiam, ['Phần trăm', 'Số tiền'], true)) return false;
         if ($loaiGiam === 'Phần trăm' && $giaTriGiam > 100) return false;
         if ($giaTriGiam <= 0 || $soLuong <= 0 || $gioiHanSuDung <= 0) return false;
@@ -101,6 +108,7 @@ class Voucher
         return true;
     }
 
+    // [UC60 - Hình 68] Voucher::kiemTraTrungMa(maVoucher) — Bảng 134 STT 7
     public static function kiemTraTrungMa(string $maVoucher, ?PDO $pdo = null): bool
     {
         return self::timTheoMa($maVoucher, $pdo) !== null;
@@ -120,17 +128,23 @@ class Voucher
         $db = self::pdo($pdo);
         $v = self::timTheoMa($maVoucher, $db);
         if (!$v) return false;
-        $stmt = $db->prepare("SELECT COUNT(*) FROM DonHang WHERE maKhachHang = ? AND maVoucher = ? AND trangThai <> 'Đã hủy'");
-        $stmt->execute([$maKhachHang, strtoupper(trim($maVoucher))]);
-        return ((int)$stmt->fetchColumn()) < (int)$v['gioiHanSuDung'];
+        return DonHang::demLuotDungVoucher($maKhachHang, $maVoucher, $db) < (int)$v['gioiHanSuDung'];
     }
 
+    // [UC64 - Hình 72] Voucher::demLuotSuDung(maVoucher) — Bảng 134 STT 3
     public static function demLuotSuDung(string $maVoucher, ?PDO $pdo = null): int
     {
-        $v = self::timTheoMa($maVoucher, $pdo);
-        return $v ? (int)$v['luotDaDung'] : 0;
+        $db = self::pdo($pdo);
+        $ma = strtoupper(trim($maVoucher));
+        $v = self::timTheoMa($ma, $db);
+        $luotCot = $v ? (int)$v['luotDaDung'] : 0;
+        $stmt = $db->prepare("SELECT COUNT(*) FROM DonHang WHERE maVoucher = ?");
+        $stmt->execute([$ma]);
+        $luotDon = (int)$stmt->fetchColumn();
+        return max($luotCot, $luotDon);
     }
 
+    // [UC60 - UC64 - Hình 68 - Hình 72] Voucher::timTatCa() — Bảng 134 STT 10
     public static function timTatCa(?string $trangThai = null, ?PDO $pdo = null): array
     {
         $sql = "SELECT v.*, dk.giaTriToiThieu, dk.nhomHang, dk.doiTuong
@@ -141,7 +155,7 @@ class Voucher
             $sql .= " WHERE v.trangThai = ?";
             $ts[] = $trangThai;
         }
-        $sql .= " ORDER BY v.ngayBatDau DESC";
+        $sql .= " ORDER BY v.ngayBatDau DESC, v.maVoucher ASC";
         $stmt = self::pdo($pdo)->prepare($sql);
         $stmt->execute($ts);
         $ketQua = [];
@@ -157,11 +171,13 @@ class Voucher
         return $ketQua;
     }
 
+    // [UC61 - Hình 69] Voucher::timTheoTrangThai(trangThai) — Bảng 134 STT 12
     public static function timTheoTrangThai(string $trangThai, ?PDO $pdo = null): array
     {
         return self::timTatCa($trangThai, $pdo);
     }
 
+    // [UC61, UC62 - Hình 69, Hình 70] Voucher::timTheoMa(maVoucher) — Bảng 134 STT 11
     public static function timTheoMa(string $maVoucher, ?PDO $pdo = null): ?array
     {
         $stmt = self::pdo($pdo)->prepare(
@@ -175,14 +191,19 @@ class Voucher
         return $r ?: null;
     }
 
+    // [UC60 - Hình 68] Voucher::luu(maVoucher, loaiGiam, giaTriGiam, soLuong, gioiHanSuDung, ngayBatDau, ngayKetThuc) — Bảng 134 STT 8
     public static function luu(string $maVoucher, string $loaiGiam, float $giaTriGiam, int $soLuong, int $gioiHanSuDung, string $ngayBatDau, string $ngayKetThuc, ?PDO $pdo = null): bool
     {
+        if (mb_strlen(trim($maVoucher)) > 30) {
+            return false;
+        }
         return self::pdo($pdo)->prepare(
             "INSERT INTO Voucher (maVoucher, loaiGiam, giaTriGiam, soLuong, gioiHanSuDung, luotDaDung, ngayBatDau, ngayKetThuc, trangThai)
              VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'Đang hiệu lực')"
         )->execute([strtoupper(trim($maVoucher)), $loaiGiam, $giaTriGiam, $soLuong, max(1, $gioiHanSuDung), $ngayBatDau, $ngayKetThuc]);
     }
 
+    // [UC62 - Hình 70] Voucher::capNhat(maVoucher, loaiGiam, giaTriGiam, soLuong, gioiHanSuDung, ngayBatDau, ngayKetThuc) — Bảng 134 STT 1
     public static function capNhat(string $maVoucher, string $loaiGiam, float $giaTriGiam, int $soLuong, int $gioiHanSuDung, string $ngayBatDau, string $ngayKetThuc, ?PDO $pdo = null): bool
     {
         return self::pdo($pdo)->prepare(
@@ -190,17 +211,26 @@ class Voucher
         )->execute([$loaiGiam, $giaTriGiam, $soLuong, max(1, $gioiHanSuDung), $ngayBatDau, $ngayKetThuc, strtoupper(trim($maVoucher))]);
     }
 
+    // [UC63 - Hình 71] Voucher::capNhatTrangThai(maVoucher, trangThai) — Bảng 134 STT 2
     public static function capNhatTrangThai(string $maVoucher, string $trangThai, ?PDO $pdo = null): bool
     {
         return self::pdo($pdo)->prepare("UPDATE Voucher SET trangThai = ? WHERE maVoucher = ?")->execute([$trangThai, strtoupper(trim($maVoucher))]);
     }
 
-    public static function ghiNhanLuotSuDung(string $maVoucher, ?int $maKhachHang = null, ?PDO $pdo = null): bool
+    // [UC28 - Hình 36] Voucher::tangLuotDaDung(maVoucher) — Bảng 134 STT 9
+    public static function tangLuotDaDung(string $maVoucher, ?PDO $pdo = null): bool
     {
-        return self::pdo($pdo)->prepare("UPDATE Voucher SET luotDaDung = luotDaDung + 1 WHERE maVoucher = ? AND luotDaDung < soLuong")
-            ->execute([strtoupper(trim($maVoucher))]);
+        $stmt = self::pdo($pdo)->prepare("UPDATE Voucher SET luotDaDung = luotDaDung + 1 WHERE maVoucher = ? AND luotDaDung < soLuong");
+        $stmt->execute([strtoupper(trim($maVoucher))]);
+        return $stmt->rowCount() > 0;
     }
 
+    public static function ghiNhanLuotSuDung(string $maVoucher, ?int $maKhachHang = null, ?PDO $pdo = null): bool
+    {
+        return self::tangLuotDaDung($maVoucher, $pdo);
+    }
+
+    // [UC31, UC36 - Hình 39, Hình 44] Voucher::hoanLuotSuDung(maVoucher) — Bảng 134 STT 4
     public static function hoanLuotSuDung(?string $maVoucher, ?PDO $pdo = null): bool
     {
         if (empty($maVoucher)) return true;
@@ -208,9 +238,9 @@ class Voucher
             ->execute([strtoupper(trim($maVoucher))]);
     }
 
+    // [UC64 - Hình 72] Voucher::xoa(maVoucher) — Bảng 134 STT 13
     public static function xoa(string $maVoucher, ?PDO $pdo = null): bool
     {
         return self::pdo($pdo)->prepare("DELETE FROM Voucher WHERE maVoucher = ?")->execute([strtoupper(trim($maVoucher))]);
     }
-
 }

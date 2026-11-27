@@ -1,5 +1,6 @@
 <?php
-// Controller BCE: QuanLyDonHangCtrl (UC33 - UC34) — Phụ lục B.1 Lan03
+// Controller BCE: QuanLyDonHangCtrl (UC33 - UC34)
+// Đồng bộ 1-1 Báo cáo v4: Bảng 42 - Bảng 43, Sequence Hình 41 - Hình 42
 
 class QuanLyDonHangCtrl
 {
@@ -10,6 +11,7 @@ class QuanLyDonHangCtrl
         $this->pdo = $pdo;
     }
 
+    // [UC33, UC34 - Hình 41, Hình 42] QuanLyDonHangCtrl::layDanhSachDonHang -> DonHang::timTheoTrangThai
     public function layDanhSachDonHang(?string $trangThai = null): array
     {
         $dsDonHang = DonHang::timTheoTrangThai($trangThai, $this->pdo);
@@ -30,6 +32,7 @@ class QuanLyDonHangCtrl
             $muc['soDienThoai'] = $dh['soDienThoai'];
             $muc['nguoiNhan'] = $dh['nguoiNhan'];
             $muc['diaChiGiaoHang'] = $dh['diaChiGiaoHang'];
+            $muc['tenNhanVienDuyet'] = $dh['tenNhanVienDuyet'] ?? '';
             $muc['phuongThucThanhToan'] = $dh['phuongThuc'] ?? '';
             $muc['trangThaiThanhToan'] = $dh['trangThaiThanhToan'] ?? '';
             $muc['maPhieuXuat'] = isset($dh['maPhieuXuat']) ? (int)$dh['maPhieuXuat'] : null;
@@ -41,8 +44,8 @@ class QuanLyDonHangCtrl
         return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách đơn hàng thành công', 'duLieu' => $ketQua];
     }
 
-    // UC33: duyetDonHang(maDonHang) — Kiểm tra giữ chỗ TonKho & gửi ThongBao cho khách
-    public function duyetDonHang(int $maDonHang): array
+    // [UC33 - Hình 41] QuanLyDonHangCtrl::duyetDonHang -> DonHang::timTheoMa -> TonKho::kiemTraGiuCho -> DonHang::capNhatTrangThai -> ThongBao::taoThongBao
+    public function duyetDonHang(int $maDonHang, ?int $maNhanVienDuyet = null): array
     {
         $donHang = DonHang::timTheoMa($maDonHang, false, $this->pdo);
         if (!$donHang) {
@@ -55,7 +58,7 @@ class QuanLyDonHangCtrl
             return ['thanhCong' => false, 'thongBao' => 'Không thể duyệt đơn hàng vì tồn kho thực tế đang thiếu so với số lượng giữ chỗ', 'duLieu' => null, 'maHttp' => 400];
         }
 
-        DonHang::capNhatTrangThai($maDonHang, 'Đã duyệt', $this->pdo);
+        DonHang::capNhatTrangThai($maDonHang, 'Đã duyệt', null, $maNhanVienDuyet, $this->pdo);
         if (!empty($donHang['maTaiKhoan'])) {
             ThongBao::taoThongBao((int)$donHang['maTaiKhoan'], "Đơn hàng #{$maDonHang} của bạn đã được duyệt và chuẩn bị đóng gói.", $this->pdo);
         }
@@ -67,11 +70,11 @@ class QuanLyDonHangCtrl
         ];
     }
 
-    // UC34: capNhatTienDo(maDonHang, trangThaiMoi)
-    public function capNhatTienDo(int $maDonHang, string $trangThaiMoi): array
+    // [UC34 - Hình 42] QuanLyDonHangCtrl::capNhatTienDo -> DonHang::kiemTraChuyenTrangThai -> PhieuXuat::kiemTraDaXacNhan -> DonHang::capNhatTrangThai -> ThanhToan::capNhatTrangThai
+    public function capNhatTienDo(int $maDonHang, string $trangThaiMoi, ?int $maNhanVienDuyet = null): array
     {
         if ($trangThaiMoi === 'Đã duyệt') {
-            return $this->duyetDonHang($maDonHang);
+            return $this->duyetDonHang($maDonHang, $maNhanVienDuyet);
         }
 
         $donHang = DonHang::timTheoMa($maDonHang, false, $this->pdo);
@@ -82,7 +85,7 @@ class QuanLyDonHangCtrl
         if ($trangThaiMoi === 'Đã giao shipper') {
             return [
                 'thanhCong' => false,
-                'thongBao'  => 'Trạng thái Đã giao shipper được cập nhật tự động khi Nhân viên Kho xác nhận xuất kho (UC16)',
+                'thongBao'  => 'Trạng thái Đã giao shipper được cập nhật tự động khi Nhân viên Kho xác nhận xuất kho',
                 'duLieu'    => null,
                 'maHttp'    => 400,
             ];

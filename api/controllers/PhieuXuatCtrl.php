@@ -1,5 +1,6 @@
 <?php
-// Controller BCE: PhieuXuatCtrl (UC15 - UC17) — Phụ lục B.1 Lan03
+// Controller BCE: PhieuXuatCtrl (UC15 - UC17)
+// Đồng bộ 1-1 Báo cáo v4: Bảng 24 - Bảng 26, Sequence Hình 23 - Hình 25
 
 class PhieuXuatCtrl
 {
@@ -24,6 +25,7 @@ class PhieuXuatCtrl
         foreach ($dsPhieu as $p) {
             $phieu = PhieuXuat::tuMang($p)->chuyenThanhMang();
             $phieu['tenNhanVien'] = $p['tenNhanVien'] ?? '';
+            $phieu['tenNguoiXacNhan'] = $p['tenNguoiXacNhan'] ?? '';
             $phieu['trangThaiDonHang'] = $p['trangThaiDonHang'] ?? '';
             $phieu['chiTiet'] = $ctTheoPhieu[$phieu['maPhieuXuat']] ?? [];
             $ketQua[] = $phieu;
@@ -31,17 +33,20 @@ class PhieuXuatCtrl
         return $ketQua;
     }
 
+    // [UC15, UC17 - Hình 23, Hình 25] PhieuXuatCtrl::layDanhSachPhieuXuat -> PhieuXuat::timTatCa
     public function layDanhSachPhieuXuat(): array
     {
         return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách phiếu xuất thành công', 'duLieu' => $this->dinhKemChiTiet(PhieuXuat::timTatCa($this->pdo))];
     }
 
+    // [UC17 - Hình 25] PhieuXuatCtrl::locPhieuXuat -> PhieuXuat::timTheoDieuKien
     public function locPhieuXuat(?string $trangThai = null, ?string $tuNgay = null, ?string $denNgay = null): array
     {
         $ds = PhieuXuat::timTheoDieuKien($trangThai, $tuNgay, $denNgay, $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Lọc danh sách phiếu xuất thành công', 'duLieu' => $this->dinhKemChiTiet($ds)];
     }
 
+    // [UC16, UC17 - Hình 24, Hình 25] PhieuXuatCtrl::layChiTietPhieuXuat -> PhieuXuat::timTheoMa -> ChiTietPhieuXuat::timTheoPhieuXuat
     public function layChiTietPhieuXuat(int $maPhieuXuat): array
     {
         $px = PhieuXuat::timTheoMa($maPhieuXuat, false, $this->pdo);
@@ -49,6 +54,8 @@ class PhieuXuatCtrl
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy phiếu xuất', 'duLieu' => null, 'maHttp' => 404];
         }
         $muc = PhieuXuat::tuMang($px)->chuyenThanhMang();
+        $muc['tenNhanVien'] = $px['tenNhanVien'] ?? '';
+        $muc['tenNguoiXacNhan'] = $px['tenNguoiXacNhan'] ?? '';
         $muc['chiTiet'] = ChiTietPhieuXuat::timTheoPhieuXuat($maPhieuXuat, $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Lấy chi tiết phiếu xuất thành công', 'duLieu' => $muc];
     }
@@ -62,7 +69,7 @@ class PhieuXuatCtrl
         return ['thanhCong' => true, 'thongBao' => 'Lấy thông tin đơn hàng để lập phiếu xuất thành công', 'duLieu' => ['donHang' => $dh, 'chiTiet' => DonHang::layChiTietDonHang($maDonHang, $this->pdo)]];
     }
 
-    // UC15: luuPhieuXuat(maDonHang, ghiChu)
+    // [UC15 - Hình 23] PhieuXuatCtrl::luuPhieuXuat -> DonHang::kiemTraTrangThaiXuatKho -> PhieuXuat::kiemTraDaCoPhieuXuat -> TonKho::kiemTraDuHangTheoGiuCho -> PhieuXuat::luu -> ChiTietPhieuXuat::luu -> DonHang::capNhatTrangThai
     public function luuPhieuXuat(int $maDonHang, int $maNhanVien, ?string $ghiChu = null): array
     {
         try {
@@ -78,7 +85,6 @@ class PhieuXuatCtrl
                 return ['thanhCong' => false, 'thongBao' => 'Đơn hàng này đã có phiếu xuất kho đang hiệu lực', 'duLieu' => null, 'maHttp' => 409];
             }
 
-            // Kiểm tra tonThucTe >= soLuong trước khi lập phiếu xuất
             if (!TonKho::kiemTraDuHangTheoGiuCho($maDonHang, $this->pdo)) {
                 hoanTacGiaoDich($this->pdo);
                 return ['thanhCong' => false, 'thongBao' => 'Tồn thực tế trong kho hiện không đủ số lượng cho đơn hàng này', 'duLieu' => null, 'maHttp' => 400];
@@ -99,8 +105,8 @@ class PhieuXuatCtrl
         }
     }
 
-    // UC16: xacNhanXuatKho(maPhieuXuat)
-    public function xacNhanXuatKho(int $maPhieuXuat): array
+    // [UC16 - Hình 24] PhieuXuatCtrl::xacNhanXuatKho -> PhieuXuat::kiemTraHopLe -> ChiTietPhieuXuat::timTheoPhieuXuat -> TonKho::truTonThucTe -> TonKho::giamGiuCho -> PhieuXuat::capNhatTrangThai -> DonHang::capNhatTrangThai -> ThongBao::taoThongBao
+    public function xacNhanXuatKho(int $maPhieuXuat, ?int $maNguoiXacNhan = null): array
     {
         try {
             batDauGiaoDich($this->pdo);
@@ -119,13 +125,16 @@ class PhieuXuatCtrl
             }
 
             foreach (ChiTietPhieuXuat::timTheoPhieuXuat($maPhieuXuat, $this->pdo) as $ct) {
-                if (!TonKho::truTonThucTe((int)$ct['maDienThoai'], (int)$ct['soLuong'], $this->pdo)) {
+                $maDt = (int)$ct['maDienThoai'];
+                $soLuong = (int)$ct['soLuong'];
+                if (!TonKho::truTonThucTe($maDt, $soLuong, $this->pdo)) {
                     hoanTacGiaoDich($this->pdo);
-                    return ['thanhCong' => false, 'thongBao' => 'Tồn thực tế trong kho không đủ để xuất sản phẩm mã #' . $ct['maDienThoai'], 'duLieu' => null, 'maHttp' => 400];
+                    return ['thanhCong' => false, 'thongBao' => 'Tồn thực tế trong kho không đủ để xuất sản phẩm mã #' . $maDt, 'duLieu' => null, 'maHttp' => 400];
                 }
+                TonKho::giamGiuCho($maDt, $soLuong, $this->pdo);
             }
 
-            PhieuXuat::capNhatTrangThai($maPhieuXuat, 'Đã xuất', $this->pdo);
+            PhieuXuat::capNhatTrangThai($maPhieuXuat, 'Đã xuất', $maNguoiXacNhan, null, $this->pdo);
             DonHang::capNhatTrangThai($maDonHang, 'Đã giao shipper', $this->pdo);
 
             if (!empty($donHang['maTaiKhoan'])) {

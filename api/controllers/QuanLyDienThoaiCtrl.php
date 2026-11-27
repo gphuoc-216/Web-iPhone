@@ -1,5 +1,6 @@
 <?php
-// Controller BCE: QuanLyDienThoaiCtrl (UC4 - UC6, UC10) — Phụ lục B.1 Lan03
+// Controller BCE: QuanLyDienThoaiCtrl (UC4 - UC6, UC10)
+// Khớp 1-1 Sequence Diagram Hình 12 - Hình 14, Hình 18 và Bảng 231 dòng 4 - 6, 8 (Báo cáo v4)
 
 class QuanLyDienThoaiCtrl
 {
@@ -10,211 +11,214 @@ class QuanLyDienThoaiCtrl
         $this->pdo = $pdo;
     }
 
-    private function chuanHoaDongDienThoai(array $dong): array
+    // Chuẩn hóa dữ liệu trả về cho màn hình (không gọi thêm Entity)
+    private function chuanHoaDongDienThoai(array $dong, ?ThongSoKyThuat $thongSo = null): array
     {
         $dt = DienThoai::tuMang($dong)->chuyenThanhMang();
         $dt['hinhAnh'] = chuanHoaDuongDanAnh($dt['hinhAnh']);
         $dt['tenDanhMuc'] = $dong['tenDanhMuc'] ?? '';
-        $dt['thongSoKyThuat'] = [
+        $dt['thongSoKyThuat'] = $thongSo !== null ? $thongSo->chuyenThanhMang() : [
             'maThongSo'    => isset($dong['maThongSo']) ? (int)$dong['maThongSo'] : null,
             'manHinh'      => $dong['manHinh'] ?? null,
             'chip'         => $dong['chip'] ?? null,
-            'ram'          => (int)($dong['ram'] ?? 8),
-            'rom'          => (int)($dong['rom'] ?? 128),
+            'ram'          => (int)($dong['ram'] ?? 0),
+            'rom'          => (int)($dong['rom'] ?? 0),
             'camera'       => $dong['camera'] ?? null,
-            'dungLuongPin' => (int)($dong['dungLuongPin'] ?? 4500),
+            'dungLuongPin' => (int)($dong['dungLuongPin'] ?? 0),
             'heDieuHanh'   => $dong['heDieuHanh'] ?? null,
         ];
-        $dt['tonKho'] = [
-            'tonThucTe'  => (int)($dong['tonThucTe'] ?? 0),
-            'giuCho'     => (int)($dong['giuCho'] ?? 0),
-            'tonKhaDung' => (int)($dong['tonKhaDung'] ?? 0),
-        ];
+        $tonThucTe = (int)($dong['tonThucTe'] ?? 0);
+        $giuCho = (int)($dong['giuCho'] ?? 0);
+        $dt['tonKho'] = ['tonThucTe' => $tonThucTe, 'giuCho' => $giuCho, 'tonKhaDung' => $tonThucTe - $giuCho];
         return $dt;
     }
 
+    private function danhSach(array $nguon): array
+    {
+        return array_map(fn($d) => $this->chuanHoaDongDienThoai($d), $nguon);
+    }
+
+    // [UC4, UC5, UC6 - Hình 12] layDanhSachDienThoai() -> DienThoai::timDangKinhDoanh()
+    public function layDanhSachDienThoai(): array
+    {
+        $danhSachDienThoai = $this->danhSach(DienThoai::timDangKinhDoanh($this->pdo));
+        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách điện thoại thành công', 'duLieu' => $danhSachDienThoai];
+    }
+
+    // [UC4 - Hình 12] layDanhSachDanhMuc() -> DanhMuc::timTatCa()
     public function layDanhSachDanhMuc(): array
     {
         return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách danh mục thành công', 'duLieu' => DanhMuc::timTatCa($this->pdo)];
     }
 
-    public function layDanhSachDienThoai(?string $trangThai = null): array
-    {
-        $danhSach = array_map([$this, 'chuanHoaDongDienThoai'], DienThoai::timTatCa($trangThai, $this->pdo));
-        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách điện thoại thành công', 'duLieu' => $danhSach];
-    }
-
+    // [UC10 - Hình 18] layDanhSachNgungKinhDoanh() -> DienThoai::timNgungKinhDoanh()
     public function layDanhSachNgungKinhDoanh(): array
     {
-        $danhSach = array_map([$this, 'chuanHoaDongDienThoai'], DienThoai::timNgungKinhDoanh($this->pdo));
-        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách điện thoại ngừng kinh doanh thành công', 'duLieu' => $danhSach];
+        $danhSachDienThoai = $this->danhSach(DienThoai::timNgungKinhDoanh($this->pdo));
+        $thongBao = empty($danhSachDienThoai) ? 'Chưa có sản phẩm ngừng kinh doanh' : 'Lấy danh sách điện thoại ngừng kinh doanh thành công';
+        return ['thanhCong' => true, 'thongBao' => $thongBao, 'duLieu' => $danhSachDienThoai];
     }
 
+    // [UC5 - Hình 13] layThongTinDienThoai(maDienThoai) -> DienThoai::timTheoMa -> ThongSoKyThuat::timTheoDienThoai -> DanhMuc::timTatCa
     public function layThongTinDienThoai(int $maDienThoai): array
     {
-        $dong = DienThoai::timTheoMa($maDienThoai, $this->pdo);
-        if (!$dong) {
+        $dienThoai = DienThoai::timTheoMa($maDienThoai, $this->pdo);
+        if (!$dienThoai) {
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy thông tin điện thoại', 'duLieu' => null, 'maHttp' => 404];
         }
-        return ['thanhCong' => true, 'thongBao' => 'Lấy thông tin điện thoại thành công', 'duLieu' => $this->chuanHoaDongDienThoai($dong)];
+        $thongSo = ThongSoKyThuat::timTheoDienThoai($maDienThoai, $this->pdo);
+        $danhSachDanhMuc = DanhMuc::timTatCa($this->pdo);
+
+        $duLieu = $this->chuanHoaDongDienThoai($dienThoai, $thongSo);
+        $duLieu['danhSachDanhMuc'] = $danhSachDanhMuc;
+        return ['thanhCong' => true, 'thongBao' => 'Lấy thông tin điện thoại thành công', 'duLieu' => $duLieu];
     }
 
-    // UC4: luuDienThoai(ten, maDanhMuc, moTa, thongSo, hinhAnh)
-    public function luuDienThoai(array $duLieu, ?array $tepAnh = null): array
+    // [UC4 - Hình 12] luuDienThoai(ten, maDanhMuc, hang, moTa, thongSo, hinhAnh)
+    //   -> DanhMuc::kiemTraTonTai(maDanhMuc) -> DienThoai::kiemTraHopLe(ten, thongSo) -> DienThoai::kiemTraTrungTen(ten, 0)
+    //   -> DienThoai::luu(ten, maDanhMuc, hang, moTa, hinhAnh) -> ThongSoKyThuat::luu(maDienThoai, thongSo) -> DienThoai::timDangKinhDoanh()
+    public function luuDienThoai(string $ten, int $maDanhMuc, string $hang, ?string $moTa, array $thongSo, ?string $hinhAnh): array
     {
-        $ten = trim((string)($duLieu['ten'] ?? ''));
-        $maDanhMuc = (int)($duLieu['maDanhMuc'] ?? 0);
-        $hang = trim((string)($duLieu['hang'] ?? ''));
-        $moTa = isset($duLieu['moTa']) ? trim((string)$duLieu['moTa']) : null;
-        $giaVonBinhQuan = (float)($duLieu['giaVonBinhQuan'] ?? 0);
-        $giaBan = (float)($duLieu['giaBan'] ?? 0);
-        $thongSo = is_array($duLieu['thongSoKyThuat'] ?? null) ? $duLieu['thongSoKyThuat'] : $duLieu;
+        $ten = trim($ten);
+        $hang = trim($hang);
+        $ketQuaDanhMuc = DanhMuc::kiemTraTonTai($maDanhMuc, $this->pdo);
+        $ketQuaKiemTra = DienThoai::kiemTraHopLe($ten, $thongSo);
+        $daTrungTen = DienThoai::kiemTraTrungTen($ten, 0, $this->pdo);
 
-        if (!DienThoai::kiemTraHopLe($ten, $thongSo) || $maDanhMuc <= 0 || $hang === '') {
-            return ['thanhCong' => false, 'thongBao' => 'Vui lòng nhập đầy đủ tên, danh mục, hãng và thông số kỹ thuật hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        if (!$ketQuaDanhMuc || !$ketQuaKiemTra || $hang === '') {
+            return ['thanhCong' => false, 'thongBao' => 'Dữ liệu không hợp lệ (thiếu tên, chưa chọn danh mục hoặc thông số sai định dạng)', 'duLieu' => null, 'maHttp' => 400];
         }
-        if (!DanhMuc::kiemTraTonTai($maDanhMuc, $this->pdo)) {
-            return ['thanhCong' => false, 'thongBao' => 'Danh mục được chọn không tồn tại', 'duLieu' => null, 'maHttp' => 404];
+        if ($daTrungTen) {
+            return ['thanhCong' => false, 'thongBao' => 'Tên điện thoại đã tồn tại', 'duLieu' => null, 'maHttp' => 409];
         }
-
-        $duongDanAnh = $this->luuAnhSanPham($tepAnh) ?? trim((string)($duLieu['hinhAnh'] ?? 'storage/shop-assets/img/iphone17.webp'));
 
         try {
             batDauGiaoDich($this->pdo);
-            $maDienThoai = DienThoai::luu($ten, $maDanhMuc, $hang, $moTa, $duongDanAnh, $giaVonBinhQuan, $giaBan, 'Đang kinh doanh', $this->pdo);
+            $maDienThoai = DienThoai::luu($ten, $maDanhMuc, $hang, $moTa, $hinhAnh, $this->pdo);
             ThongSoKyThuat::luu($maDienThoai, $thongSo, $this->pdo);
-            TonKho::khoiTaoTonKho($maDienThoai, 1, $this->pdo);
             xacNhanGiaoDich($this->pdo);
-
-            return [
-                'thanhCong' => true,
-                'thongBao'  => 'Thêm điện thoại mới thành công',
-                'duLieu'    => ['maDienThoai' => $maDienThoai, 'hinhAnh' => chuanHoaDuongDanAnh($duongDanAnh)],
-                'maHttp'    => 201,
-            ];
         } catch (Throwable $ngoaiLe) {
             hoanTacGiaoDich($this->pdo);
             error_log('luuDienThoai: ' . $ngoaiLe->getMessage());
-            return ['thanhCong' => false, 'thongBao' => 'Không thể lưu điện thoại mới. Vui lòng kiểm tra lại dữ liệu', 'duLieu' => null, 'maHttp' => 500];
+            return ['thanhCong' => false, 'thongBao' => 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau', 'duLieu' => null, 'maHttp' => 500];
         }
+
+        $danhSachDienThoai = $this->danhSach(DienThoai::timDangKinhDoanh($this->pdo));
+        return [
+            'thanhCong' => true,
+            'thongBao'  => 'Thêm điện thoại thành công',
+            'duLieu'    => ['maDienThoai' => $maDienThoai, 'danhSachDienThoai' => $danhSachDienThoai],
+            'maHttp'    => 201,
+        ];
     }
 
-    // UC5: capNhatDienThoai(maDienThoai, ten, maDanhMuc, moTa, thongSo, hinhAnh)
-    public function capNhatDienThoai(int $maDienThoai, array $duLieu, ?array $tepAnh = null): array
+    // [UC5 - Hình 13] capNhatDienThoai(maDienThoai, ten, maDanhMuc, hang, moTa, thongSo, hinhAnh)
+    //   -> DanhMuc::kiemTraTonTai(maDanhMuc) -> DienThoai::kiemTraHopLe(ten, thongSo) -> DienThoai::kiemTraTrungTen(ten, maDienThoai)
+    //   -> DienThoai::capNhat(maDienThoai, ten, maDanhMuc, hang, moTa, hinhAnh) -> ThongSoKyThuat::capNhat(maDienThoai, thongSo) -> DienThoai::timDangKinhDoanh()
+    public function capNhatDienThoai(int $maDienThoai, string $ten, int $maDanhMuc, string $hang, ?string $moTa, array $thongSo, ?string $hinhAnh): array
     {
-        if ($maDienThoai <= 0 || !DienThoai::kiemTraTonTai($maDienThoai, $this->pdo)) {
-            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy điện thoại cần cập nhật', 'duLieu' => null, 'maHttp' => 404];
-        }
-        if (!empty($duLieu['maDanhMuc']) && !DanhMuc::kiemTraTonTai((int)$duLieu['maDanhMuc'], $this->pdo)) {
-            return ['thanhCong' => false, 'thongBao' => 'Danh mục được chọn không tồn tại', 'duLieu' => null, 'maHttp' => 404];
-        }
+        $ten = trim($ten);
+        $hang = trim($hang);
+        $ketQuaDanhMuc = DanhMuc::kiemTraTonTai($maDanhMuc, $this->pdo);
+        $ketQuaKiemTra = DienThoai::kiemTraHopLe($ten, $thongSo);
+        $daTrungTen = DienThoai::kiemTraTrungTen($ten, $maDienThoai, $this->pdo);
 
-        $duongDanAnhMoi = $this->luuAnhSanPham($tepAnh);
-        if ($duongDanAnhMoi !== null) {
-            $duLieu['hinhAnh'] = $duongDanAnhMoi;
+        if (!$ketQuaDanhMuc || !$ketQuaKiemTra || $hang === '') {
+            return ['thanhCong' => false, 'thongBao' => 'Dữ liệu không hợp lệ (thiếu tên, chưa chọn danh mục hoặc thông số sai định dạng)', 'duLieu' => null, 'maHttp' => 400];
         }
-        $thongSo = is_array($duLieu['thongSoKyThuat'] ?? null)
-            ? $duLieu['thongSoKyThuat']
-            : array_intersect_key($duLieu, array_flip(['manHinh', 'chip', 'ram', 'rom', 'camera', 'dungLuongPin', 'heDieuHanh']));
+        if ($daTrungTen) {
+            return ['thanhCong' => false, 'thongBao' => 'Tên điện thoại đã tồn tại', 'duLieu' => null, 'maHttp' => 409];
+        }
 
         try {
             batDauGiaoDich($this->pdo);
-            DienThoai::capNhat($maDienThoai, $duLieu, $this->pdo);
-            if (!empty($thongSo)) {
-                ThongSoKyThuat::capNhat($maDienThoai, $thongSo, $this->pdo);
-            }
+            DienThoai::capNhat($maDienThoai, $ten, $maDanhMuc, $hang, $moTa, $hinhAnh, $this->pdo);
+            ThongSoKyThuat::capNhat($maDienThoai, $thongSo, $this->pdo);
             xacNhanGiaoDich($this->pdo);
-
-            return ['thanhCong' => true, 'thongBao' => 'Cập nhật thông tin điện thoại thành công', 'duLieu' => ['maDienThoai' => $maDienThoai]];
         } catch (Throwable $ngoaiLe) {
             hoanTacGiaoDich($this->pdo);
             error_log('capNhatDienThoai: ' . $ngoaiLe->getMessage());
-            return ['thanhCong' => false, 'thongBao' => 'Không thể cập nhật thông tin điện thoại', 'duLieu' => null, 'maHttp' => 500];
+            return ['thanhCong' => false, 'thongBao' => 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau', 'duLieu' => null, 'maHttp' => 500];
         }
+
+        $danhSachDienThoai = $this->danhSach(DienThoai::timDangKinhDoanh($this->pdo));
+        return [
+            'thanhCong' => true,
+            'thongBao'  => 'Cập nhật thông tin điện thoại thành công',
+            'duLieu'    => ['maDienThoai' => $maDienThoai, 'danhSachDienThoai' => $danhSachDienThoai],
+        ];
     }
 
-    public function capNhatTrangThaiDienThoai(int $maDienThoai, string $trangThai): array
-    {
-        if (!in_array($trangThai, ['Đang kinh doanh', 'Ngừng kinh doanh'], true)) {
-            return ['thanhCong' => false, 'thongBao' => 'Trạng thái kinh doanh không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
-        }
-        DienThoai::capNhatTrangThai($maDienThoai, $trangThai, $this->pdo);
-        return ['thanhCong' => true, 'thongBao' => 'Cập nhật trạng thái kinh doanh thành công', 'duLieu' => ['maDienThoai' => $maDienThoai, 'trangThai' => $trangThai]];
-    }
-
-    // UC6: xoaDienThoai(maDienThoai)
+    // [UC6 - Hình 14] xoaDienThoai(maDienThoai)
+    //   -> DonHang::demDonChuaHoanTatTheoDienThoai(maDienThoai) -> DienThoai::kiemTraPhatSinhGiaoDich(maDienThoai)
+    //   -> alt: loiDangCoDonHang | DienThoai::chuyenNgungKinhDoanh(maDienThoai) | DienThoai::xoa(maDienThoai) -> DienThoai::timDangKinhDoanh()
     public function xoaDienThoai(int $maDienThoai): array
     {
-        if ($maDienThoai <= 0) {
-            return ['thanhCong' => false, 'thongBao' => 'Mã điện thoại không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        $soDonChuaHoanTat = DonHang::demDonChuaHoanTatTheoDienThoai($maDienThoai, $this->pdo);
+        $coGiaoDich = DienThoai::kiemTraPhatSinhGiaoDich($maDienThoai, $this->pdo);
+
+        if ($soDonChuaHoanTat > 0) {
+            return [
+                'thanhCong' => false,
+                'thongBao'  => "Không thể xóa: điện thoại đang nằm trong {$soDonChuaHoanTat} đơn hàng chưa hoàn tất",
+                'duLieu'    => ['soDonChuaHoanTat' => $soDonChuaHoanTat],
+                'maHttp'    => 409,
+            ];
         }
-        if (DonHang::demDonChuaHoanTatTheoDienThoai($maDienThoai, $this->pdo) > 0) {
-            return ['thanhCong' => false, 'thongBao' => 'Không thể xóa điện thoại đang nằm trong đơn hàng chưa hoàn tất', 'duLieu' => null, 'maHttp' => 409];
-        }
-        if (DienThoai::kiemTraPhatSinhGiaoDich($maDienThoai, $this->pdo)) {
+
+        if ($coGiaoDich) {
             DienThoai::chuyenNgungKinhDoanh($maDienThoai, $this->pdo);
+            $danhSachDienThoai = $this->danhSach(DienThoai::timDangKinhDoanh($this->pdo));
             return [
                 'thanhCong' => true,
-                'thongBao'  => 'Sản phẩm đã phát sinh giao dịch nên được xóa mềm (chuyển sang Ngừng kinh doanh)',
-                'duLieu'    => ['maDienThoai' => $maDienThoai, 'trangThai' => 'Ngừng kinh doanh', 'kieuXoa' => 'xoaMem'],
+                'thongBao'  => 'Điện thoại đã phát sinh giao dịch nên được chuyển sang trạng thái Ngừng kinh doanh',
+                'duLieu'    => ['maDienThoai' => $maDienThoai, 'kieuXoa' => 'xoaMem', 'danhSachDienThoai' => $danhSachDienThoai],
             ];
         }
 
         try {
             batDauGiaoDich($this->pdo);
-            TonKho::xoaTheoDienThoai($maDienThoai, $this->pdo);
-            ThongSoKyThuat::xoaTheoDienThoai($maDienThoai, $this->pdo);
             DienThoai::xoa($maDienThoai, $this->pdo);
             xacNhanGiaoDich($this->pdo);
-            return ['thanhCong' => true, 'thongBao' => 'Đã xóa cứng điện thoại khỏi hệ thống', 'duLieu' => ['maDienThoai' => $maDienThoai, 'kieuXoa' => 'xoaCung']];
         } catch (Throwable $ngoaiLe) {
             hoanTacGiaoDich($this->pdo);
-            DienThoai::chuyenNgungKinhDoanh($maDienThoai, $this->pdo);
-            return ['thanhCong' => true, 'thongBao' => 'Sản phẩm có dữ liệu liên kết nên được chuyển sang Ngừng kinh doanh', 'duLieu' => ['maDienThoai' => $maDienThoai, 'trangThai' => 'Ngừng kinh doanh']];
+            error_log('xoaDienThoai: ' . $ngoaiLe->getMessage());
+            return ['thanhCong' => false, 'thongBao' => 'Không thể xóa điện thoại. Vui lòng thử lại sau', 'duLieu' => null, 'maHttp' => 500];
         }
+
+        $danhSachDienThoai = $this->danhSach(DienThoai::timDangKinhDoanh($this->pdo));
+        return [
+            'thanhCong' => true,
+            'thongBao'  => 'Xóa thành công',
+            'duLieu'    => ['maDienThoai' => $maDienThoai, 'kieuXoa' => 'xoaCung', 'danhSachDienThoai' => $danhSachDienThoai],
+        ];
     }
 
-    // UC10: khoiPhucDienThoai(maDienThoai)
+    // [UC10 - Hình 18] khoiPhucDienThoai(maDienThoai) -> DienThoai::timTheoMa(maDienThoai) -> DanhMuc::kiemTraTonTai(maDanhMuc) -> yeuCauXacNhan
     public function khoiPhucDienThoai(int $maDienThoai): array
     {
-        $dong = DienThoai::timTheoMa($maDienThoai, $this->pdo);
-        if (!$dong) {
+        $dienThoai = DienThoai::timTheoMa($maDienThoai, $this->pdo);
+        if (!$dienThoai) {
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy điện thoại cần khôi phục', 'duLieu' => null, 'maHttp' => 404];
         }
-        if (!DanhMuc::kiemTraTonTai((int)$dong['maDanhMuc'], $this->pdo)) {
-            return ['thanhCong' => false, 'thongBao' => 'Không thể khôi phục vì danh mục của sản phẩm không còn tồn tại', 'duLieu' => null, 'maHttp' => 400];
+
+        $ketQuaDanhMuc = DanhMuc::kiemTraTonTai((int)$dienThoai['maDanhMuc'], $this->pdo);
+        if (!$ketQuaDanhMuc) {
+            return ['thanhCong' => false, 'thongBao' => 'Danh mục của sản phẩm đã bị xóa. Vui lòng gán sản phẩm vào danh mục khác trước khi khôi phục', 'duLieu' => null, 'maHttp' => 400];
         }
-        DienThoai::capNhatTrangThai($maDienThoai, 'Đang kinh doanh', $this->pdo);
-        return ['thanhCong' => true, 'thongBao' => 'Khôi phục kinh doanh điện thoại thành công', 'duLieu' => ['maDienThoai' => $maDienThoai, 'trangThai' => 'Đang kinh doanh']];
+
+        return ['thanhCong' => true, 'thongBao' => 'Vui lòng xác nhận khôi phục kinh doanh', 'duLieu' => ['maDienThoai' => $maDienThoai, 'yeuCauXacNhan' => true]];
     }
 
-    // Bỏ 'svg' để chống Stored XSS
-    public function luuAnhSanPham(?array $tepAnh): ?string
+    // [UC10 - Hình 18] xacNhanKhoiPhuc(maDienThoai) -> DienThoai::capNhatTrangThai(maDienThoai, "Đang kinh doanh") -> DienThoai::timNgungKinhDoanh()
+    public function xacNhanKhoiPhuc(int $maDienThoai): array
     {
-        if (!$tepAnh || ($tepAnh['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            return null;
-        }
-        $duoiHopLe = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-        $duoiTep = strtolower(pathinfo($tepAnh['name'], PATHINFO_EXTENSION));
-        if (!in_array($duoiTep, $duoiHopLe, true)) {
-            return null;
-        }
-        if (@getimagesize($tepAnh['tmp_name']) === false) {
-            return null;
-        }
-
-        $thuMucUpload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'uploads';
-        if (!is_dir($thuMucUpload)) {
-            @mkdir($thuMucUpload, 0775, true);
-        }
-
-        $tenGoc = preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($tepAnh['name'], PATHINFO_FILENAME));
-        $tenMoi = (trim($tenGoc, '_') ?: 'dienthoai') . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $duoiTep;
-        $dichDen = $thuMucUpload . DIRECTORY_SEPARATOR . $tenMoi;
-
-        if (move_uploaded_file($tepAnh['tmp_name'], $dichDen)) {
-            return 'uploads/' . $tenMoi;
-        }
-        return null;
+        DienThoai::capNhatTrangThai($maDienThoai, 'Đang kinh doanh', $this->pdo);
+        $danhSachDienThoai = $this->danhSach(DienThoai::timNgungKinhDoanh($this->pdo));
+        return [
+            'thanhCong' => true,
+            'thongBao'  => 'Khôi phục kinh doanh thành công',
+            'duLieu'    => ['maDienThoai' => $maDienThoai, 'trangThai' => 'Đang kinh doanh', 'danhSachNgungKinhDoanh' => $danhSachDienThoai],
+        ];
     }
 }

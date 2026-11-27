@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: TonKho — Bảng TonKho
+// Entity BCE: TonKho — Bảng TonKho (Mục 3.4.3.28: Bảng 131, Bảng 132; RDM: Bảng 168 — 3NF: không lưu maKho, tonKhaDung)
 
 class TonKho
 {
@@ -8,7 +8,6 @@ class TonKho
 
     private ?int $maTonKho = null;
     private ?int $maDienThoai = null;
-    private int $maKho = 1;
     private int $tonThucTe = 0;
     private int $giuCho = 0;
     private int $tonKhaDung = 0;
@@ -21,26 +20,23 @@ class TonKho
         if (array_key_exists('maDienThoai', $duLieu)) {
             $this->maDienThoai = isset($duLieu['maDienThoai']) && $duLieu['maDienThoai'] !== '' ? (int)$duLieu['maDienThoai'] : null;
         }
-        if (array_key_exists('maKho', $duLieu)) {
-            $this->maKho = (int)($duLieu['maKho'] ?? 0);
-        }
         if (array_key_exists('tonThucTe', $duLieu)) {
             $this->tonThucTe = (int)($duLieu['tonThucTe'] ?? 0);
         }
         if (array_key_exists('giuCho', $duLieu)) {
             $this->giuCho = (int)($duLieu['giuCho'] ?? 0);
         }
-        if (array_key_exists('tonKhaDung', $duLieu)) {
-            $this->tonKhaDung = (int)($duLieu['tonKhaDung'] ?? 0);
-        }
+        $this->tonKhaDung = array_key_exists('tonKhaDung', $duLieu)
+            ? (int)$duLieu['tonKhaDung']
+            : ($this->tonThucTe - $this->giuCho);
     }
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
+        if ($tenThuocTinh === 'tonKhaDung') {
+            return $this->tonThucTe - $this->giuCho;
         }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -63,12 +59,11 @@ class TonKho
     public function chuyenThanhMang(): array
     {
         return [
-            'maTonKho' => $this->maTonKho,
+            'maTonKho'    => $this->maTonKho,
             'maDienThoai' => $this->maDienThoai,
-            'maKho' => $this->maKho,
-            'tonThucTe' => $this->tonThucTe,
-            'giuCho' => $this->giuCho,
-            'tonKhaDung' => $this->tonKhaDung,
+            'tonThucTe'   => $this->tonThucTe,
+            'giuCho'      => $this->giuCho,
+            'tonKhaDung'  => $this->tonThucTe - $this->giuCho,
         ];
     }
 
@@ -77,154 +72,147 @@ class TonKho
         return $pdo ?? layKetNoiCsdl(true);
     }
 
-    public static function khoiTaoTonKho(int $maDienThoai, int $maKho = 1, ?PDO $pdo = null): bool
+    // [UC20 - Hình 28] TonKho::timTheoDienThoai(maDienThoai) — Bảng 132 STT 12
+    public static function timTheoDienThoai(int $maDienThoai, bool $khoaDong = false, ?PDO $pdo = null): ?array
     {
-        $stmt = self::pdo($pdo)->prepare("INSERT IGNORE INTO TonKho (maDienThoai, maKho, tonThucTe, giuCho, tonKhaDung) VALUES (?, ?, 0, 0, 0)");
-        return $stmt->execute([$maDienThoai, $maKho]);
-    }
-
-    public static function timTheoDienThoai(int $maDienThoai, int $maKho = 1, bool $khoaDong = false, ?PDO $pdo = null): ?array
-    {
-        $sql = "SELECT * FROM TonKho WHERE maDienThoai = ? AND maKho = ? LIMIT 1" . ($khoaDong ? " FOR UPDATE" : "");
+        $sql = "SELECT maTonKho, maDienThoai, tonThucTe, giuCho, (tonThucTe - giuCho) AS tonKhaDung
+                FROM TonKho WHERE maDienThoai = ? LIMIT 1" . ($khoaDong ? " FOR UPDATE" : "");
         $stmt = self::pdo($pdo)->prepare($sql);
-        $stmt->execute([$maDienThoai, $maKho]);
+        $stmt->execute([$maDienThoai]);
         $row = $stmt->fetch();
         return $row ?: null;
     }
 
+    // [UC9, UC22, UC23, UC28 - Hình 17, 30, 31, 36] TonKho::tinhTonKhaDung(maDienThoai) — Bảng 132 STT 15
     public static function tinhTonKhaDung(int $maDienThoai, ?PDO $pdo = null): int
     {
-        $ton = self::timTheoDienThoai($maDienThoai, 1, false, $pdo);
+        $ton = self::timTheoDienThoai($maDienThoai, false, $pdo);
         return $ton ? ((int)$ton['tonThucTe'] - (int)$ton['giuCho']) : 0;
     }
 
+    // [UC18 - Hình 26] TonKho::layTonKhoHienHanh() — Bảng 132 STT 8
     public static function layTonKhoHienHanh(?PDO $pdo = null): array
     {
-        return self::layTonTheoKho(1, $pdo);
+        return self::pdo($pdo)->query(
+            "SELECT tk.maTonKho, tk.maDienThoai, tk.tonThucTe, tk.giuCho,
+                    (tk.tonThucTe - tk.giuCho) AS tonKhaDung,
+                    d.ten AS tenDienThoai, d.hang
+             FROM TonKho tk
+             JOIN DienThoai d ON d.maDienThoai = tk.maDienThoai
+             ORDER BY (tk.tonThucTe - tk.giuCho) ASC"
+        )->fetchAll();
     }
 
-    public static function layTonTheoKho(int $maKho = 1, ?PDO $pdo = null): array
-    {
-        $stmt = self::pdo($pdo)->prepare(
-            "SELECT tk.*, d.ten AS tenDienThoai, d.hang
-             FROM TonKho tk JOIN DienThoai d ON d.maDienThoai = tk.maDienThoai
-             WHERE tk.maKho = ? ORDER BY tk.tonKhaDung ASC"
-        );
-        $stmt->execute([$maKho]);
-        return $stmt->fetchAll();
-    }
-
-    public static function tangTonThucTe(int $maDienThoai, int $soLuong, int $maKho = 1, ?PDO $pdo = null): int
+    // [UC13 - Hình 21] TonKho::tangTonThucTe(maDienThoai, soLuong) — Bảng 132 STT 11
+    public static function tangTonThucTe(int $maDienThoai, int $soLuong, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
-        $ton = self::timTheoDienThoai($maDienThoai, $maKho, true, $db);
-        $tonCu = $ton ? (int)$ton['tonThucTe'] : 0;
+        $ton = self::timTheoDienThoai($maDienThoai, true, $db);
         if ($ton) {
-            $thucTeMoi = $tonCu + $soLuong;
-            $khaDungMoi = $thucTeMoi - (int)$ton['giuCho'];
-            $db->prepare("UPDATE TonKho SET tonThucTe = ?, tonKhaDung = ? WHERE maTonKho = ?")
-               ->execute([$thucTeMoi, $khaDungMoi, $ton['maTonKho']]);
-        } else {
-            $db->prepare("INSERT INTO TonKho (maDienThoai, maKho, tonThucTe, giuCho, tonKhaDung) VALUES (?, ?, ?, 0, ?)")
-               ->execute([$maDienThoai, $maKho, $soLuong, $soLuong]);
+            $thucTeMoi = (int)$ton['tonThucTe'] + $soLuong;
+            return $db->prepare("UPDATE TonKho SET tonThucTe = ? WHERE maTonKho = ?")
+                      ->execute([$thucTeMoi, $ton['maTonKho']]);
         }
-        return $tonCu;
+        return $db->prepare("INSERT INTO TonKho (maDienThoai, tonThucTe, giuCho) VALUES (?, ?, 0)")
+                  ->execute([$maDienThoai, $soLuong]);
     }
 
+    // [UC16 - Hình 24] TonKho::truTonThucTe(maDienThoai, soLuong) — Bảng 132 STT 16 (chỉ trừ tonThucTe; giamGiuCho xử lý riêng)
     public static function truTonThucTe(int $maDienThoai, int $soLuong, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
-        $ton = self::timTheoDienThoai($maDienThoai, 1, true, $db);
+        $ton = self::timTheoDienThoai($maDienThoai, true, $db);
         if (!$ton || (int)$ton['tonThucTe'] < $soLuong) {
             return false;
         }
         $thucTeMoi = (int)$ton['tonThucTe'] - $soLuong;
-        $giuChoMoi = max(0, (int)$ton['giuCho'] - $soLuong);
-        $khaDungMoi = $thucTeMoi - $giuChoMoi;
-        return $db->prepare("UPDATE TonKho SET tonThucTe = ?, giuCho = ?, tonKhaDung = ? WHERE maTonKho = ?")
-                  ->execute([$thucTeMoi, $giuChoMoi, $khaDungMoi, $ton['maTonKho']]);
+        return $db->prepare("UPDATE TonKho SET tonThucTe = ? WHERE maTonKho = ?")
+                  ->execute([$thucTeMoi, $ton['maTonKho']]);
     }
 
+    // [UC16 - Hình 24] TonKho::giamGiuCho(maDienThoai, soLuong) — Bảng 132 STT 3
     public static function giamGiuCho(int $maDienThoai, int $soLuong, ?PDO $pdo = null): bool
     {
         return self::nhaGiuCho($maDienThoai, $soLuong, $pdo);
     }
 
+    // [UC28 - Hình 36] TonKho::giuChoTam(maDienThoai, soLuong) — Bảng 132 STT 4
     public static function giuChoTam(int $maDienThoai, int $soLuong, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
-        $ton = self::timTheoDienThoai($maDienThoai, 1, true, $db);
-        if (!$ton || (int)$ton['tonKhaDung'] < $soLuong) {
+        $ton = self::timTheoDienThoai($maDienThoai, true, $db);
+        $khaDung = $ton ? ((int)$ton['tonThucTe'] - (int)$ton['giuCho']) : 0;
+        if (!$ton || $khaDung < $soLuong) {
             return false;
         }
         $giuChoMoi = (int)$ton['giuCho'] + $soLuong;
-        $khaDungMoi = (int)$ton['tonThucTe'] - $giuChoMoi;
-        return $db->prepare("UPDATE TonKho SET giuCho = ?, tonKhaDung = ? WHERE maTonKho = ?")
-                  ->execute([$giuChoMoi, $khaDungMoi, $ton['maTonKho']]);
+        return $db->prepare("UPDATE TonKho SET giuCho = ? WHERE maTonKho = ?")
+                  ->execute([$giuChoMoi, $ton['maTonKho']]);
     }
 
+    // [UC28 - Hình 36] TonKho::nhaGiuChoTam(maDienThoai, soLuong) — Bảng 132 STT 10
     public static function nhaGiuChoTam(int $maDienThoai, int $soLuong, ?PDO $pdo = null): bool
     {
         return self::nhaGiuCho($maDienThoai, $soLuong, $pdo);
     }
 
+    // [UC31, UC36 - Hình 39, Hình 44] TonKho::nhaGiuCho(maDienThoai, soLuong) — Bảng 132 STT 9
     public static function nhaGiuCho(int $maDienThoai, int $soLuong, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
-        $ton = self::timTheoDienThoai($maDienThoai, 1, true, $db);
+        $ton = self::timTheoDienThoai($maDienThoai, true, $db);
         if (!$ton) return false;
         $giuChoMoi = max(0, (int)$ton['giuCho'] - $soLuong);
-        $khaDungMoi = (int)$ton['tonThucTe'] - $giuChoMoi;
-        return $db->prepare("UPDATE TonKho SET giuCho = ?, tonKhaDung = ? WHERE maTonKho = ?")
-                  ->execute([$giuChoMoi, $khaDungMoi, $ton['maTonKho']]);
+        return $db->prepare("UPDATE TonKho SET giuCho = ? WHERE maTonKho = ?")
+                  ->execute([$giuChoMoi, $ton['maTonKho']]);
     }
 
+    // [UC28 - Hình 36] TonKho::chuyenGiuChoChoDonHang(maDienThoai, soLuong, maDonHang) — Bảng 132 STT 1
     public static function chuyenGiuChoChoDonHang(int $maDienThoai, int $soLuong, int $maDonHang, ?PDO $pdo = null): bool
     {
-        return $maDonHang > 0 && $soLuong > 0;
+        return $maDienThoai > 0 && $maDonHang > 0 && $soLuong > 0;
     }
 
-    public static function dieuChinhTonThucTe(int $maDienThoai, int $soLuongThucTe, int $maKho = 1, ?PDO $pdo = null): array
+    // [UC19 - Hình 27] TonKho::dieuChinhTonThucTe(maDienThoai, soLuongThucTe) — Bảng 132 STT 2
+    public static function dieuChinhTonThucTe(int $maDienThoai, int $soLuongThucTe, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
-        $ton = self::timTheoDienThoai($maDienThoai, $maKho, true, $db);
+        $ton = self::timTheoDienThoai($maDienThoai, true, $db);
         if ($ton) {
-            $giuCho = (int)$ton['giuCho'];
-            $khaDungMoi = $soLuongThucTe - $giuCho;
-            $db->prepare("UPDATE TonKho SET tonThucTe = ?, tonKhaDung = ? WHERE maTonKho = ?")
-               ->execute([$soLuongThucTe, $khaDungMoi, $ton['maTonKho']]);
-            return ['thieuGiuCho' => $soLuongThucTe < $giuCho, 'giuCho' => $giuCho];
+            return $db->prepare("UPDATE TonKho SET tonThucTe = ? WHERE maTonKho = ?")
+                      ->execute([max(0, $soLuongThucTe), $ton['maTonKho']]);
         }
-        $db->prepare("INSERT INTO TonKho (maDienThoai, maKho, tonThucTe, giuCho, tonKhaDung) VALUES (?, ?, ?, 0, ?)")
-           ->execute([$maDienThoai, $maKho, $soLuongThucTe, $soLuongThucTe]);
-        return ['thieuGiuCho' => false, 'giuCho' => 0];
+        return $db->prepare("INSERT INTO TonKho (maDienThoai, tonThucTe, giuCho) VALUES (?, ?, 0)")
+                  ->execute([$maDienThoai, max(0, $soLuongThucTe)]);
     }
 
+    // [UC33 - Hình 41] TonKho::kiemTraGiuCho(maDonHang) — Bảng 132 STT 6
     public static function kiemTraGiuCho(int $maDonHang, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
         $stmt = $db->prepare(
-            "SELECT ctdh.soLuong, tk.tonThucTe, tk.giuCho
+            "SELECT ctdh.soLuong, COALESCE(tk.tonThucTe, 0) AS tonThucTe, COALESCE(tk.giuCho, 0) AS giuCho
              FROM ChiTietDonHang ctdh
-             LEFT JOIN TonKho tk ON tk.maDienThoai = ctdh.maDienThoai AND tk.maKho = 1
+             LEFT JOIN TonKho tk ON tk.maDienThoai = ctdh.maDienThoai
              WHERE ctdh.maDonHang = ?"
         );
         $stmt->execute([$maDonHang]);
         foreach ($stmt->fetchAll() as $r) {
-            if ((int)($r['tonThucTe'] ?? 0) < (int)$r['soLuong'] || (int)($r['tonThucTe'] ?? 0) < (int)($r['giuCho'] ?? 0)) {
+            if ((int)$r['tonThucTe'] < (int)$r['soLuong'] || (int)$r['tonThucTe'] < (int)$r['giuCho']) {
                 return false;
             }
         }
         return true;
     }
 
+    // [UC15 - Hình 23] TonKho::kiemTraDuHangTheoGiuCho(maDonHang) — Bảng 132 STT 5
     public static function kiemTraDuHangTheoGiuCho(int $maDonHang, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
         $stmt = $db->prepare(
             "SELECT ctdh.soLuong, COALESCE(tk.tonThucTe, 0) AS tonThucTe
              FROM ChiTietDonHang ctdh
-             LEFT JOIN TonKho tk ON tk.maDienThoai = ctdh.maDienThoai AND tk.maKho = 1
+             LEFT JOIN TonKho tk ON tk.maDienThoai = ctdh.maDienThoai
              WHERE ctdh.maDonHang = ?"
         );
         $stmt->execute([$maDonHang]);
@@ -236,39 +224,52 @@ class TonKho
         return true;
     }
 
+    // [UC19 - Hình 27] TonKho::kiemTraTonThieuGiuCho() — Bảng 132 STT 7
     public static function kiemTraTonThieuGiuCho(?PDO $pdo = null): array
     {
-        return self::pdo($pdo)->query("SELECT * FROM TonKho WHERE tonThucTe < giuCho")->fetchAll();
+        return self::pdo($pdo)->query(
+            "SELECT DISTINCT dh.*
+             FROM DonHang dh
+             JOIN ChiTietDonHang ct ON ct.maDonHang = dh.maDonHang
+             JOIN TonKho tk ON tk.maDienThoai = ct.maDienThoai
+             WHERE tk.tonThucTe < tk.giuCho
+               AND dh.trangThai IN ('Chờ duyệt', 'Đã duyệt', 'Đang đóng gói')"
+        )->fetchAll();
     }
 
-    public static function timTheoNguongCanhBaoSom(int $nguongSom, int $nguongToiDa = 350, ?PDO $pdo = null): array
+    // [UC56 - Hình 64] TonKho::timTheoNguongCanhBaoSom(nguong) — Bảng 132 STT 14
+    public static function timTheoNguongCanhBaoSom(int $nguong, int $nguongToiDa = 350, ?PDO $pdo = null): array
     {
         $stmt = self::pdo($pdo)->prepare(
-            "SELECT tk.*, d.ten AS tenDienThoai, d.hang
+            "SELECT tk.maTonKho, tk.maDienThoai, tk.tonThucTe, tk.giuCho,
+                    (tk.tonThucTe - tk.giuCho) AS tonKhaDung,
+                    d.ten AS tenDienThoai, d.hang, dm.ten AS tenDanhMuc
              FROM TonKho tk
              JOIN DienThoai d ON d.maDienThoai = tk.maDienThoai
-             WHERE tk.tonKhaDung <= ? OR tk.tonThucTe > ?
-             ORDER BY tk.tonKhaDung ASC"
+             LEFT JOIN DanhMuc dm ON dm.maDanhMuc = d.maDanhMuc
+             WHERE (tk.tonThucTe - tk.giuCho) <= ? OR tk.tonThucTe > ?
+             ORDER BY (tk.tonThucTe - tk.giuCho) ASC"
         );
-        $stmt->execute([$nguongSom, $nguongToiDa]);
+        $stmt->execute([$nguong, $nguongToiDa]);
         return $stmt->fetchAll();
     }
 
-    public static function timTheoDieuKienCanhBao(?string $loaiCanhBao, array $nguong, ?PDO $pdo = null): array
+    // [UC20 - Hình 28] TonKho::timTheoDieuKienCanhBao(loaiCanhBao, nguong) — Bảng 132 STT 13
+    public static function timTheoDieuKienCanhBao(?string $loaiCanhBao, $nguong, ?PDO $pdo = null): array
     {
-        $som = (int)($nguong['nguongSom'] ?? 15);
-        $min = (int)($nguong['nguongToiThieu'] ?? 5);
-        $max = (int)($nguong['nguongToiDa'] ?? 350);
+        if (is_array($nguong)) {
+            $som = (int)($nguong['nguongSom'] ?? 15);
+            $min = (int)($nguong['nguongToiThieu'] ?? 5);
+            $max = (int)($nguong['nguongToiDa'] ?? 350);
+        } else {
+            $som = (int)$nguong;
+            $min = 5;
+            $max = 350;
+        }
         $tatCa = BaoCao::tongHopHangSapHet(self::timTheoNguongCanhBaoSom($som, $max, $pdo), $som, $min, $max);
         if ($loaiCanhBao !== null && $loaiCanhBao !== '') {
             return array_values(array_filter($tatCa, fn($x) => $x['mucDoCanhBao'] === $loaiCanhBao));
         }
         return $tatCa;
     }
-
-    public static function xoaTheoDienThoai(int $maDienThoai, ?PDO $pdo = null): bool
-    {
-        return self::pdo($pdo)->prepare("DELETE FROM TonKho WHERE maDienThoai = ?")->execute([$maDienThoai]);
-    }
-
 }

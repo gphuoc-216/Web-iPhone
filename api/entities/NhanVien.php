@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: NhanVien — Bảng NhanVien
+// Entity BCE: NhanVien — Bảng NhanVien (Mục 3.4.3.19: Bảng 113, Bảng 114; RDM: Bảng 158)
 
 class NhanVien
 {
@@ -9,7 +9,7 @@ class NhanVien
     private ?int $maNhanVien = null;
     private ?int $maTaiKhoan = null;
     private string $hoTen = '';
-    private ?string $soDienThoai = null;
+    private string $soDienThoai = '';
 
     public function __construct(array $duLieu = [])
     {
@@ -23,16 +23,13 @@ class NhanVien
             $this->hoTen = (string)($duLieu['hoTen'] ?? '');
         }
         if (array_key_exists('soDienThoai', $duLieu)) {
-            $this->soDienThoai = isset($duLieu['soDienThoai']) && $duLieu['soDienThoai'] !== '' ? (string)$duLieu['soDienThoai'] : null;
+            $this->soDienThoai = trim((string)($duLieu['soDienThoai'] ?? ''));
         }
     }
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
-        }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -55,9 +52,9 @@ class NhanVien
     public function chuyenThanhMang(): array
     {
         return [
-            'maNhanVien' => $this->maNhanVien,
-            'maTaiKhoan' => $this->maTaiKhoan,
-            'hoTen' => $this->hoTen,
+            'maNhanVien'  => $this->maNhanVien,
+            'maTaiKhoan'  => $this->maTaiKhoan,
+            'hoTen'       => $this->hoTen,
             'soDienThoai' => $this->soDienThoai,
         ];
     }
@@ -67,20 +64,25 @@ class NhanVien
         return $pdo ?? layKetNoiCsdl(true);
     }
 
-    public static function luu(int $maTaiKhoan, string $hoTen, ?string $soDienThoai = null, ?PDO $pdo = null): int
+    // [UC51 - Hình 59] NhanVien::luu(maTaiKhoan, hoTen, soDienThoai) — Bảng 114 STT 2
+    public static function luu(int $maTaiKhoan, string $hoTen, ?string $soDienThoai = '', ?PDO $pdo = null): int
     {
         $db = self::pdo($pdo);
+        $sdtSach = trim((string)($soDienThoai ?? ''));
         $db->prepare("INSERT INTO NhanVien (maTaiKhoan, hoTen, soDienThoai) VALUES (?, ?, ?)")
-           ->execute([$maTaiKhoan, trim($hoTen), $soDienThoai]);
+           ->execute([$maTaiKhoan, trim($hoTen), $sdtSach]);
         return (int)$db->lastInsertId();
     }
 
-    public static function capNhat(int $maTaiKhoan, string $hoTen, ?string $soDienThoai = null, ?PDO $pdo = null): bool
+    // [UC52 - Hình 60] NhanVien::capNhat(maTaiKhoan, hoTen, soDienThoai) — Bảng 114 STT 1
+    public static function capNhat(int $maTaiKhoan, string $hoTen, ?string $soDienThoai = '', ?PDO $pdo = null): bool
     {
+        $sdtSach = trim((string)($soDienThoai ?? ''));
         return self::pdo($pdo)->prepare("UPDATE NhanVien SET hoTen = ?, soDienThoai = ? WHERE maTaiKhoan = ?")
-            ->execute([trim($hoTen), $soDienThoai, $maTaiKhoan]);
+            ->execute([trim($hoTen), $sdtSach, $maTaiKhoan]);
     }
 
+    // [UC51 - Hình 59] NhanVien::timTatCa() — Bảng 114 STT 3
     public static function timTatCa(?PDO $pdo = null): array
     {
         return self::pdo($pdo)->query(
@@ -91,6 +93,7 @@ class NhanVien
         )->fetchAll();
     }
 
+    // [UC52 - Hình 60] NhanVien::timTheoTaiKhoan(maTaiKhoan) — Bảng 114 STT 4
     public static function timTheoTaiKhoan(int $maTaiKhoan, ?PDO $pdo = null): ?array
     {
         $stmt = self::pdo($pdo)->prepare(
@@ -104,6 +107,7 @@ class NhanVien
         return $r ?: null;
     }
 
+    // [UC13, UC19 - Hình 21, Hình 27] NhanVien::layMaTaiKhoan(maNhanVien) — Bảng 114 STT 5
     public static function layMaTaiKhoan(int $maNhanVien, ?PDO $pdo = null): ?int
     {
         $stmt = self::pdo($pdo)->prepare("SELECT maTaiKhoan FROM NhanVien WHERE maNhanVien = ? LIMIT 1");
@@ -111,5 +115,4 @@ class NhanVien
         $v = $stmt->fetchColumn();
         return $v !== false ? (int)$v : null;
     }
-
 }

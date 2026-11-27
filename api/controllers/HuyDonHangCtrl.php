@@ -1,5 +1,6 @@
 <?php
-// Controller BCE: HuyDonHangCtrl (UC31 - UC32, UC35 - UC38) — Phụ lục B.1 Lan03
+// Controller BCE: HuyDonHangCtrl (UC31 - UC32, UC35 - UC38)
+// Đồng bộ 1-1 Báo cáo v4: Bảng 40 - Bảng 41 & Bảng 44 - Bảng 47, Sequence Hình 39 - Hình 40 & Hình 43 - Hình 46
 
 class HuyDonHangCtrl
 {
@@ -15,7 +16,7 @@ class HuyDonHangCtrl
         return (new HoSoKhachHangCtrl($this->pdo))->layLichSuMuaHang($maKhachHang);
     }
 
-    // UC31: tuHuyDonHang(maDonHang, lyDo) — Khách tự hủy trực tiếp đơn Chờ duyệt
+    // [UC31 - Hình 39] HuyDonHangCtrl::tuHuyDonHang -> DonHang::kiemTraTrangThai -> ChiTietDonHang::timTheoDonHang -> TonKho::nhaGiuCho -> Voucher::hoanLuotSuDung -> DonHang::capNhatTrangThai -> ThanhToan::kiemTraDaThanhToanTrucTuyen -> ThanhToan::danhDauCanHoanTien
     public function tuHuyDonHang(int $maDonHang, int $maKhachHang, string $lyDo = 'Khách hàng tự hủy đơn'): array
     {
         try {
@@ -36,19 +37,24 @@ class HuyDonHangCtrl
                 TonKho::nhaGiuCho((int)$ct['maDienThoai'], (int)$ct['soLuong'], $this->pdo);
             }
             Voucher::hoanLuotSuDung($donHang['maVoucher'] ?? null, $this->pdo);
-            DonHang::capNhatTrangThai($maDonHang, 'Đã hủy', $this->pdo);
-            YeuCauHuyDon::luu($maDonHang, trim($lyDo) ?: 'Khách hàng tự hủy đơn', 'Đã xác nhận', $this->pdo);
 
-            $trangThaiTtMoi = ThanhToan::danhDauCanHoanTien($maDonHang, $this->pdo);
-            if ($trangThaiTtMoi === 'Cần hoàn tiền') {
+            $lyDoSach = trim($lyDo) ?: 'Khách hàng tự hủy đơn';
+            DonHang::capNhatTrangThai($maDonHang, 'Đã hủy', $lyDoSach, null, $this->pdo);
+            YeuCauHuyDon::luu($maDonHang, $lyDoSach, 'Đã xác nhận', $this->pdo);
+
+            $daThanhToanOnline = ThanhToan::kiemTraDaThanhToanTrucTuyen($maDonHang, $this->pdo);
+            ThanhToan::danhDauCanHoanTien($maDonHang, $this->pdo);
+            $trangThaiTtMoi = $daThanhToanOnline ? 'Cần hoàn tiền' : 'Đã hủy';
+
+            if ($daThanhToanOnline) {
                 ThongBao::taoThongBaoTheoVaiTro('Nhân viên Bán hàng / CSKH', "Đơn hàng #{$maDonHang} (đã thanh toán trực tuyến) vừa được khách tự hủy và cần hoàn tiền.", $this->pdo);
             }
 
             xacNhanGiaoDich($this->pdo);
             return [
                 'thanhCong' => true,
-                'thongBao'  => 'Đã hủy đơn hàng thành công' . ($trangThaiTtMoi === 'Cần hoàn tiền' ? '. Yêu cầu hoàn tiền đã được chuyển tới bộ phận CSKH' : ''),
-                'duLieu'    => ['maDonHang' => $maDonHang, 'trangThai' => 'Đã hủy', 'trangThaiThanhToan' => $trangThaiTtMoi],
+                'thongBao'  => 'Đã hủy đơn hàng thành công' . ($daThanhToanOnline ? '. Yêu cầu hoàn tiền đã được chuyển tới bộ phận CSKH' : ''),
+                'duLieu'    => ['maDonHang' => $maDonHang, 'trangThai' => 'Đã hủy', 'lyDoHuy' => $lyDoSach, 'trangThaiThanhToan' => $trangThaiTtMoi],
             ];
         } catch (Throwable $ngoaiLe) {
             hoanTacGiaoDich($this->pdo);
@@ -57,6 +63,7 @@ class HuyDonHangCtrl
         }
     }
 
+    // [UC32 - Hình 40] HuyDonHangCtrl::kiemTraDieuKienHuy -> DonHang::kiemTraTrangThai -> YeuCauHuyDon::kiemTraDaCoYeuCau
     public function kiemTraDieuKienHuy(int $maDonHang, int $maKhachHang): array
     {
         $donHang = DonHang::timTheoMa($maDonHang, false, $this->pdo);
@@ -65,7 +72,7 @@ class HuyDonHangCtrl
         }
         $tt = $donHang['trangThai'];
         if ($tt === 'Chờ duyệt') {
-            return ['hopLe' => false, 'thongBao' => 'Đơn hàng đang ở trạng thái Chờ duyệt, bạn có thể bấm Hủy đơn trực tiếp (UC31)', 'maHttp' => 400];
+            return ['hopLe' => false, 'thongBao' => 'Đơn hàng đang ở trạng thái Chờ duyệt, bạn có thể bấm Hủy đơn trực tiếp', 'maHttp' => 400];
         }
         if (!in_array($tt, ['Đã duyệt', 'Đang đóng gói', 'Đã giao shipper', 'Đang giao'], true)) {
             return ['hopLe' => false, 'thongBao' => 'Đơn hàng không thuộc trạng thái cho phép gửi yêu cầu hủy', 'maHttp' => 400];
@@ -76,7 +83,7 @@ class HuyDonHangCtrl
         return ['hopLe' => true, 'thongBao' => 'Đủ điều kiện gửi yêu cầu hủy'];
     }
 
-    // UC32: guiYeuCauHuy(maDonHang, lyDo) — Chặn Chờ duyệt, chặn trùng Chờ xử lý & kiểm tra chủ sở hữu chống IDOR
+    // [UC32 - Hình 40] HuyDonHangCtrl::guiYeuCauHuy -> YeuCauHuyDon::luu -> ThongBao::taoThongBaoTheoVaiTro
     public function guiYeuCauHuy(int $maDonHang, string $lyDo, int $maKhachHang): array
     {
         $lyDo = trim($lyDo);
@@ -95,7 +102,7 @@ class HuyDonHangCtrl
         return ['thanhCong' => true, 'thongBao' => 'Gửi yêu cầu hủy đơn hàng thành công', 'duLieu' => ['maYeuCau' => $maYeuCau], 'maHttp' => 201];
     }
 
-    // UC35: layDanhSachYeuCauHuy() & kiemTraTinhTrangXuLy(maYeuCau)
+    // [UC35 - Hình 43] HuyDonHangCtrl::layDanhSachYeuCauHuy -> YeuCauHuyDon::timTatCa
     public function layDanhSachYeuCauHuy(): array
     {
         $ketQua = [];
@@ -104,6 +111,7 @@ class HuyDonHangCtrl
             $muc['tongTien'] = (float)$dong['tongTien'];
             $muc['trangThaiDonHang'] = $dong['trangThaiDonHang'];
             $muc['tenKhachHang'] = $dong['tenKhachHang'];
+            $muc['tenNhanVienXuLy'] = $dong['tenNhanVienXuLy'] ?? '';
             $muc['phuongThucThanhToan'] = $dong['phuongThuc'] ?? '';
             $muc['trangThaiThanhToan'] = $dong['trangThaiThanhToan'] ?? '';
             $muc['soTienThanhToan'] = (float)($dong['soTien'] ?? $dong['tongTien']);
@@ -113,17 +121,19 @@ class HuyDonHangCtrl
         return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách yêu cầu hủy đơn thành công', 'duLieu' => $ketQua];
     }
 
+    // [UC35 - Hình 43] HuyDonHangCtrl::kiemTraTinhTrangXuLy -> YeuCauHuyDon::timTheoMa -> PhieuXuat::kiemTraDaXacNhan
     public function kiemTraTinhTrangXuLy(int $maYeuCau): array
     {
         $yc = YeuCauHuyDon::timTheoMa($maYeuCau, false, $this->pdo);
         if (!$yc) {
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy yêu cầu hủy đơn', 'duLieu' => null, 'maHttp' => 404];
         }
+        $yc['daXacNhanXuatKho'] = PhieuXuat::kiemTraDaXacNhan((int)$yc['maDonHang'], $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Lấy tình trạng yêu cầu hủy thành công', 'duLieu' => $yc];
     }
 
-    // UC36: xacNhanHuyDon(maYeuCau) & huyDonChuDong(maDonHang, lyDo)
-    public function xacNhanHuyDon(int $maYeuCau): array
+    // [UC36 - Hình 44] HuyDonHangCtrl::xacNhanHuyDon -> PhieuXuat::kiemTraDaXacNhan -> TonKho::nhaGiuCho -> PhieuXuat::huyPhieuXuatTheoDon -> Voucher::hoanLuotSuDung -> DonHang::capNhatTrangThai -> YeuCauHuyDon::capNhatTrangThai -> ThanhToan::kiemTraDaThanhToanTrucTuyen -> ThanhToan::danhDauCanHoanTien
+    public function xacNhanHuyDon(int $maYeuCau, ?int $maNhanVienXuLy = null): array
     {
         try {
             batDauGiaoDich($this->pdo);
@@ -143,7 +153,7 @@ class HuyDonHangCtrl
 
             if (PhieuXuat::kiemTraDaXacNhan($maDonHang, $this->pdo) || in_array($donHang['trangThai'], ['Đã giao shipper', 'Đang giao', 'Đã giao thành công'], true)) {
                 hoanTacGiaoDich($this->pdo);
-                return ['thanhCong' => false, 'thongBao' => "Đơn hàng #{$maDonHang} đã xuất kho ('{$donHang['trangThai']}'), không thể xác nhận hủy — vui lòng chọn Từ chối hủy (UC37)", 'duLieu' => null, 'maHttp' => 400];
+                return ['thanhCong' => false, 'thongBao' => "Đơn hàng #{$maDonHang} đã xuất kho ('{$donHang['trangThai']}'), không thể xác nhận hủy — vui lòng chọn Từ chối yêu cầu hủy", 'duLieu' => null, 'maHttp' => 400];
             }
 
             foreach (ChiTietDonHang::timTheoDonHang($maDonHang, null, $this->pdo) as $ct) {
@@ -152,17 +162,20 @@ class HuyDonHangCtrl
             PhieuXuat::huyPhieuXuatTheoDon($maDonHang, $this->pdo);
             Voucher::hoanLuotSuDung($donHang['maVoucher'] ?? null, $this->pdo);
 
-            DonHang::capNhatTrangThai($maDonHang, 'Đã hủy', $this->pdo);
-            YeuCauHuyDon::capNhatTrangThai($maYeuCau, 'Đã xác nhận', $this->pdo);
-            $trangThaiTtMoi = ThanhToan::danhDauCanHoanTien($maDonHang, $this->pdo);
+            DonHang::capNhatTrangThai($maDonHang, 'Đã hủy', (string)($yc['lyDo'] ?? 'Xác nhận yêu cầu hủy đơn'), $maNhanVienXuLy, $this->pdo);
+            YeuCauHuyDon::capNhatTrangThai($maYeuCau, 'Đã xác nhận', null, $maNhanVienXuLy, $this->pdo);
 
-            $nd = "Đơn hàng #{$maDonHang} đã được xác nhận hủy." . ($trangThaiTtMoi === 'Cần hoàn tiền' ? ' Bộ phận CSKH đang tiến hành hoàn tiền cho bạn.' : '');
+            $daThanhToanOnline = ThanhToan::kiemTraDaThanhToanTrucTuyen($maDonHang, $this->pdo);
+            ThanhToan::danhDauCanHoanTien($maDonHang, $this->pdo);
+            $trangThaiTtMoi = $daThanhToanOnline ? 'Cần hoàn tiền' : 'Đã hủy';
+
+            $nd = "Đơn hàng #{$maDonHang} đã được xác nhận hủy." . ($daThanhToanOnline ? ' Bộ phận CSKH đang tiến hành hoàn tiền cho bạn.' : '');
             ThongBao::taoThongBao((int)$donHang['maTaiKhoan'], $nd, $this->pdo);
 
             xacNhanGiaoDich($this->pdo);
             return [
                 'thanhCong' => true,
-                'thongBao'  => 'Đã xác nhận hủy đơn hàng, nhả giữ chỗ tồn kho và hoàn lượt voucher',
+                'thongBao'  => 'Đã xác nhận hủy đơn hàng, nhả giữ chỗ tồn kho và hoàn lượt mã giảm giá',
                 'duLieu'    => ['maYeuCau' => $maYeuCau, 'maDonHang' => $maDonHang, 'trangThaiThanhToan' => $trangThaiTtMoi],
             ];
         } catch (Throwable $ngoaiLe) {
@@ -172,14 +185,14 @@ class HuyDonHangCtrl
         }
     }
 
-    public function huyDonChuDong(int $maDonHang, string $lyDo): array
+    public function huyDonChuDong(int $maDonHang, string $lyDo, ?int $maNhanVienXuLy = null): array
     {
         $maYeuCau = YeuCauHuyDon::luu($maDonHang, trim($lyDo) ?: 'CSKH chủ động hủy đơn', 'Chờ xử lý', $this->pdo);
-        return $this->xacNhanHuyDon($maYeuCau);
+        return $this->xacNhanHuyDon($maYeuCau, $maNhanVienXuLy);
     }
 
-    // UC37: tuChoiYeuCauHuy(maYeuCau, lyDo)
-    public function tuChoiYeuCauHuy(int $maYeuCau, ?string $lyDo = null): array
+    // [UC37 - Hình 45] HuyDonHangCtrl::tuChoiYeuCauHuy -> YeuCauHuyDon::capNhatTrangThai -> ThongBao::taoThongBao
+    public function tuChoiYeuCauHuy(int $maYeuCau, ?string $lyDo = null, ?int $maNhanVienXuLy = null): array
     {
         $yc = YeuCauHuyDon::timTheoMa($maYeuCau, false, $this->pdo);
         if (!$yc || $yc['trangThai'] !== 'Chờ xử lý') {
@@ -191,15 +204,15 @@ class HuyDonHangCtrl
             return ['thanhCong' => false, 'thongBao' => 'Vui lòng nhập lý do từ chối yêu cầu hủy đơn', 'duLieu' => null, 'maHttp' => 400];
         }
 
-        YeuCauHuyDon::capNhatTrangThai($maYeuCau, 'Đã từ chối', $this->pdo);
+        YeuCauHuyDon::capNhatTrangThai($maYeuCau, 'Đã từ chối', $lyDoSach, $maNhanVienXuLy, $this->pdo);
         if ($donHang && !empty($donHang['maTaiKhoan'])) {
             ThongBao::taoThongBao((int)$donHang['maTaiKhoan'], "Yêu cầu hủy đơn hàng #{$yc['maDonHang']} đã bị từ chối. Lý do: {$lyDoSach}", $this->pdo);
         }
 
-        return ['thanhCong' => true, 'thongBao' => 'Đã từ chối yêu cầu hủy đơn hàng và thông báo cho khách hàng', 'duLieu' => ['maYeuCau' => $maYeuCau, 'trangThai' => 'Đã từ chối', 'lyDo' => $lyDoSach]];
+        return ['thanhCong' => true, 'thongBao' => 'Đã từ chối yêu cầu hủy đơn hàng và thông báo cho khách hàng', 'duLieu' => ['maYeuCau' => $maYeuCau, 'trangThai' => 'Đã từ chối', 'lyDoTuChoi' => $lyDoSach]];
     }
 
-    // UC38: layThongTinHoanTien(maDonHang) & hoanTien(maDonHang, soTienHoan, lyDo)
+    // [UC38 - Hình 46] HuyDonHangCtrl::layThongTinHoanTien & hoanTien -> ThanhToan::timTheoDonHang -> kiemTraSoTienHoan -> thucHienHoanTienMoPhong
     public function layThongTinHoanTien(int $maDonHang): array
     {
         $tt = ThanhToan::timTheoDonHang($maDonHang, false, $this->pdo);

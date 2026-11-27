@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: ThanhToan — Bảng ThanhToan
+// Entity BCE: ThanhToan — Bảng ThanhToan (Mục 3.4.3.25: Bảng 125, Bảng 126; RDM: Bảng 165)
 
 class ThanhToan
 {
@@ -41,10 +41,7 @@ class ThanhToan
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
-        }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -68,18 +65,27 @@ class ThanhToan
     {
         return [
             'maThanhToan' => $this->maThanhToan,
-            'maGioHang' => $this->maGioHang,
-            'maDonHang' => $this->maDonHang,
-            'phuongThuc' => $this->phuongThuc,
-            'soTien' => $this->soTien,
-            'soTienHoan' => $this->soTienHoan,
-            'trangThai' => $this->trangThai,
+            'maGioHang'   => $this->maGioHang,
+            'maDonHang'   => $this->maDonHang,
+            'phuongThuc'  => $this->phuongThuc,
+            'soTien'      => $this->soTien,
+            'soTienHoan'  => $this->soTienHoan,
+            'trangThai'   => $this->trangThai,
         ];
     }
 
     protected static function pdo(?PDO $pdo = null): PDO
     {
         return $pdo ?? layKetNoiCsdl(true);
+    }
+
+    // [UC29 - Hình 37] ThanhToan::kiemTraPhuongThuc(phuongThuc)
+    public static function kiemTraPhuongThuc(string $phuongThuc): bool
+    {
+        return in_array(trim($phuongThuc), [
+            'Thanh toán khi nhận hàng',
+            'Thanh toán trực tuyến mô phỏng',
+        ], true);
     }
 
     public static function timTheoMa(int $maThanhToan, bool $khoaDong = false, ?PDO $pdo = null): ?array
@@ -91,6 +97,7 @@ class ThanhToan
         return $r ?: null;
     }
 
+    // [UC38 - Hình 46] ThanhToan::timTheoDonHang(maDonHang) — Bảng 126 STT 12
     public static function timTheoDonHang(int $maDonHang, bool $khoaDong = false, ?PDO $pdo = null): ?array
     {
         $sql = "SELECT * FROM ThanhToan WHERE maDonHang = ? LIMIT 1" . ($khoaDong ? " FOR UPDATE" : "");
@@ -100,20 +107,42 @@ class ThanhToan
         return $r ?: null;
     }
 
-    public static function ghiNhanPhuongThuc(int $maGioHang, string $phuongThuc, float $soTien, ?int $maDonHang = null, string $trangThai = 'Chờ thanh toán', ?PDO $pdo = null): int
+    public static function timGiaoDichChoTheoGioHang(int $maGioHang, bool $khoaDong = false, ?PDO $pdo = null): ?array
+    {
+        $sql = "SELECT * FROM ThanhToan WHERE maGioHang = ? AND maDonHang IS NULL ORDER BY maThanhToan DESC LIMIT 1" . ($khoaDong ? " FOR UPDATE" : "");
+        $stmt = self::pdo($pdo)->prepare($sql);
+        $stmt->execute([$maGioHang]);
+        $r = $stmt->fetch();
+        return $r ?: null;
+    }
+
+    // [UC29 - Hình 37] ThanhToan::ghiNhanPhuongThuc(maGioHang, phuongThuc) — Bảng 126 STT 4
+    public static function ghiNhanPhuongThuc(int $maGioHang, string $phuongThuc, ?float $soTien = null, ?int $maDonHang = null, string $trangThai = 'Chờ thanh toán', ?PDO $pdo = null): int
     {
         $db = self::pdo($pdo);
+        if ($soTien === null) {
+            $gio = GioHang::timTheoMa($maGioHang, false, $db);
+            $soTien = (float)($gio['tongThanhToan'] ?? 0.0);
+        }
         $db->prepare("INSERT INTO ThanhToan (maGioHang, maDonHang, phuongThuc, soTien, soTienHoan, trangThai) VALUES (?, ?, ?, ?, 0, ?)")
-           ->execute([$maGioHang, $maDonHang, $phuongThuc, $soTien, $trangThai]);
+           ->execute([$maGioHang, $maDonHang, trim($phuongThuc), max(0.0, $soTien), $trangThai]);
         return (int)$db->lastInsertId();
     }
 
-    public static function ganDonHang(int $maThanhToan, int $maDonHang, string $trangThai = 'Thành công', ?PDO $pdo = null): bool
+    // [UC28 - Hình 36] ThanhToan::ganDonHang(maGioHang, maDonHang) — Bảng 126 STT 3 (hỗ trợ cả maGioHang lẫn maThanhToan)
+    public static function ganDonHang(int $maGioHangHoacMaTT, int $maDonHang, string $trangThai = 'Thành công', ?PDO $pdo = null): bool
     {
-        return self::pdo($pdo)->prepare("UPDATE ThanhToan SET maDonHang = ?, trangThai = ? WHERE maThanhToan = ?")
-            ->execute([$maDonHang, $trangThai, $maThanhToan]);
+        $db = self::pdo($pdo);
+        $theoGio = self::timGiaoDichChoTheoGioHang($maGioHangHoacMaTT, true, $db);
+        if ($theoGio) {
+            return $db->prepare("UPDATE ThanhToan SET maDonHang = ?, trangThai = ? WHERE maThanhToan = ?")
+                      ->execute([$maDonHang, $trangThai, (int)$theoGio['maThanhToan']]);
+        }
+        return $db->prepare("UPDATE ThanhToan SET maDonHang = ?, trangThai = ? WHERE maThanhToan = ?")
+                  ->execute([$maDonHang, $trangThai, $maGioHangHoacMaTT]);
     }
 
+    // [UC38 - Hình 46] ThanhToan::capNhatTrangThai(maDonHang, trangThai) — Bảng 126 STT 1
     public static function capNhatTrangThai(int $maDonHang, string $trangThai, ?string $chiKhiTrangThai = null, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
@@ -124,27 +153,37 @@ class ThanhToan
         return $db->prepare("UPDATE ThanhToan SET trangThai = ? WHERE maDonHang = ?")->execute([$trangThai, $maDonHang]);
     }
 
-    public static function huyGiaoDich(int $maThanhToan, string $trangThai = 'Thất bại', ?PDO $pdo = null): bool
+    // [UC29 - Hình 37] ThanhToan::huyGiaoDich(maGioHang) — Bảng 126 STT 5 (hỗ trợ cả maGioHang lẫn maThanhToan)
+    public static function huyGiaoDich(int $maGioHangHoacMaTT, string $trangThai = 'Thất bại', ?PDO $pdo = null): bool
     {
-        return self::pdo($pdo)->prepare("UPDATE ThanhToan SET trangThai = ? WHERE maThanhToan = ?")->execute([$trangThai, $maThanhToan]);
+        $db = self::pdo($pdo);
+        $theoGio = self::timGiaoDichChoTheoGioHang($maGioHangHoacMaTT, true, $db);
+        if ($theoGio) {
+            return $db->prepare("UPDATE ThanhToan SET trangThai = ? WHERE maThanhToan = ?")
+                      ->execute([$trangThai, (int)$theoGio['maThanhToan']]);
+        }
+        return $db->prepare("UPDATE ThanhToan SET trangThai = ? WHERE maThanhToan = ?")
+                  ->execute([$trangThai, $maGioHangHoacMaTT]);
     }
 
+    // [UC31, UC36 - Hình 39, Hình 44] ThanhToan::kiemTraDaThanhToanTrucTuyen(maDonHang) — Bảng 126 STT 6
     public static function kiemTraDaThanhToanTrucTuyen(int $maDonHang, ?PDO $pdo = null): bool
     {
         $tt = self::timTheoDonHang($maDonHang, false, $pdo);
         return $tt !== null && $tt['trangThai'] === 'Thành công';
     }
 
-    public static function danhDauCanHoanTien(int $maDonHang, ?PDO $pdo = null): string
+    // [UC31, UC36 - Hình 39, Hình 44] ThanhToan::danhDauCanHoanTien(maDonHang) — Bảng 126 STT 2
+    public static function danhDauCanHoanTien(int $maDonHang, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
         $tt = self::timTheoDonHang($maDonHang, true, $db);
-        if (!$tt) return 'Đã hủy';
+        if (!$tt) return false;
         $moi = ($tt['trangThai'] === 'Thành công') ? 'Cần hoàn tiền' : 'Đã hủy';
-        $db->prepare("UPDATE ThanhToan SET trangThai = ? WHERE maThanhToan = ?")->execute([$moi, $tt['maThanhToan']]);
-        return $moi;
+        return $db->prepare("UPDATE ThanhToan SET trangThai = ? WHERE maThanhToan = ?")->execute([$moi, $tt['maThanhToan']]);
     }
 
+    // [UC38 - Hình 46] ThanhToan::kiemTraSoTienHoan(maDonHang, soTienHoan) — Bảng 126 STT 7
     public static function kiemTraSoTienHoan(int $maDonHang, float $soTienHoan, ?PDO $pdo = null): bool
     {
         $tt = self::timTheoDonHang($maDonHang, false, $pdo);
@@ -152,6 +191,7 @@ class ThanhToan
         return $soTienHoan > 0 && $soTienHoan <= (float)$tt['soTien'];
     }
 
+    // [UC38 - Hình 46] ThanhToan::thucHienHoanTienMoPhong(maDonHang, soTienHoan) — Bảng 126 STT 10
     public static function thucHienHoanTienMoPhong(int $maDonHang, float $soTienHoan, bool $thanhCong = true, ?PDO $pdo = null): bool
     {
         $db = self::pdo($pdo);
@@ -162,23 +202,31 @@ class ThanhToan
         return $db->prepare("UPDATE ThanhToan SET trangThai = 'Hoàn tiền lỗi' WHERE maDonHang = ?")->execute([$maDonHang]);
     }
 
+    // [UC29 - Hình 37] ThanhToan::thucHienThanhToanMoPhong(maGioHang, phuongThuc) — Bảng 126 STT 11
     public static function thucHienThanhToanMoPhong(int $maGioHang, string $phuongThuc): bool
     {
-        return $maGioHang > 0 && $phuongThuc !== '';
+        return $maGioHang > 0 && self::kiemTraPhuongThuc($phuongThuc);
     }
 
+    // [UC29 - Hình 37] ThanhToan::layTongTienCanThanhToan(maGioHang) — Bảng 126 STT 9
     public static function layTongTienCanThanhToan(int $maGioHang, ?PDO $pdo = null): float
     {
-        $stmt = self::pdo($pdo)->prepare("SELECT soTien FROM ThanhToan WHERE maGioHang = ? ORDER BY maThanhToan DESC LIMIT 1");
+        $db = self::pdo($pdo);
+        $stmt = $db->prepare("SELECT soTien FROM ThanhToan WHERE maGioHang = ? AND maDonHang IS NULL ORDER BY maThanhToan DESC LIMIT 1");
         $stmt->execute([$maGioHang]);
-        return (float)($stmt->fetchColumn() ?: 0.0);
+        $soTien = $stmt->fetchColumn();
+        if ($soTien !== false && (float)$soTien > 0) {
+            return (float)$soTien;
+        }
+        $gio = GioHang::timTheoMa($maGioHang, false, $db);
+        return (float)($gio['tongThanhToan'] ?? 0.0);
     }
 
+    // [UC28 - Hình 36] ThanhToan::layKetQuaThanhToan(maGioHang) — Bảng 126 STT 8
     public static function layKetQuaThanhToan(int $maGioHang, ?PDO $pdo = null): string
     {
         $stmt = self::pdo($pdo)->prepare("SELECT trangThai FROM ThanhToan WHERE maGioHang = ? ORDER BY maThanhToan DESC LIMIT 1");
         $stmt->execute([$maGioHang]);
         return (string)($stmt->fetchColumn() ?: 'Chờ thanh toán');
     }
-
 }

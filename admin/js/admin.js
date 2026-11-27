@@ -1,6 +1,7 @@
 // ============================================================================
 // admin/js/admin.js
-// Giao diện Quản trị Nội bộ BCE + RBAC 3 Actor + Hộp Thông báo thời gian thực
+// Giao diện Quản trị Nội bộ theo kiến trúc BCE & phân quyền 3 vai trò nội bộ
+// Đồng bộ thiết kế giao diện Mục 3.6 báo cáo v4 (Light Theme, chuẩn hóa ID điều khiển)
 // ============================================================================
 
 (function () {
@@ -14,32 +15,36 @@
     boDemThongBao: null,
     danhSachSanPhamCache: [],
     danhSachDanhMucCache: [],
+    maDanhMucDangChon: 0,
+    maDienThoaiDangChon: 0,
+    maTaiKhoanDangChon: 0,
+    maVoucherDangChon: '',
   };
 
   // Menu phân quyền chặt chẽ theo 3 Actor nội bộ
   const MENU_THEO_VAI_TRO = {
     'Ban Quản lý': [
-      { ma: 'bao-cao', nhan: 'Báo cáo & Thống kê (UC53-56)' },
-      { ma: 'danh-muc', nhan: 'Quản lý Danh mục (UC1-3)' },
-      { ma: 'dien-thoai', nhan: 'Quản lý Điện thoại (UC4-6,10)' },
-      { ma: 'chinh-sach-gia', nhan: 'Chính sách Giá & LN (UC11)' },
-      { ma: 'duyet-phieu-nhap', nhan: 'Duyệt Phiếu nhập (UC13)' },
-      { ma: 'duyet-kiem-ke', nhan: 'Duyệt Kiểm kê & Ngưỡng (UC19,21)' },
-      { ma: 'phi-van-chuyen', nhan: 'Phí vận chuyển (UC27)' },
-      { ma: 'khuyen-mai', nhan: 'Khuyến mãi (UC57-59)' },
-      { ma: 'voucher', nhan: 'Mã giảm giá / Voucher (UC60-64)' },
-      { ma: 'tai-khoan', nhan: 'Quản lý Tài khoản (UC48-52)' },
+      { ma: 'bao-cao', nhan: 'Báo cáo & Thống kê' },
+      { ma: 'danh-muc', nhan: 'Quản lý danh mục' },
+      { ma: 'dien-thoai', nhan: 'Quản lý điện thoại' },
+      { ma: 'chinh-sach-gia', nhan: 'Chính sách giá & Lợi nhuận' },
+      { ma: 'duyet-phieu-nhap', nhan: 'Duyệt phiếu nhập kho' },
+      { ma: 'duyet-kiem-ke', nhan: 'Duyệt kiểm kê & Ngưỡng kho' },
+      { ma: 'phi-van-chuyen', nhan: 'Quy tắc phí vận chuyển' },
+      { ma: 'khuyen-mai', nhan: 'Quản lý khuyến mãi' },
+      { ma: 'voucher', nhan: 'Quản lý mã giảm giá' },
+      { ma: 'tai-khoan', nhan: 'Quản lý tài khoản' },
     ],
     'Nhân viên Kho': [
-      { ma: 'canh-bao-kho', nhan: 'Cảnh báo Tồn kho (UC20)' },
-      { ma: 'phieu-nhap', nhan: 'Phiếu nhập kho (UC12,14)' },
-      { ma: 'phieu-xuat', nhan: 'Phiếu xuất kho (UC15-17)' },
-      { ma: 'kiem-ke', nhan: 'Kiểm kê kho (UC18)' },
+      { ma: 'canh-bao-kho', nhan: 'Cảnh báo tồn kho' },
+      { ma: 'phieu-nhap', nhan: 'Phiếu nhập kho' },
+      { ma: 'phieu-xuat', nhan: 'Phiếu xuất kho' },
+      { ma: 'kiem-ke', nhan: 'Kiểm kê tồn kho' },
     ],
     'Nhân viên Bán hàng / CSKH': [
-      { ma: 'don-hang', nhan: 'Quản lý Đơn hàng (UC33-34)' },
-      { ma: 'huy-don', nhan: 'Yêu cầu Hủy & Hoàn tiền (UC35-38)' },
-      { ma: 'khach-hang', nhan: 'Tra cứu Khách hàng (UC47)' },
+      { ma: 'don-hang', nhan: 'Quản lý đơn hàng' },
+      { ma: 'huy-don', nhan: 'Yêu cầu hủy & Hoàn tiền' },
+      { ma: 'khach-hang', nhan: 'Tra cứu khách hàng' },
     ],
   };
 
@@ -96,7 +101,7 @@
     document.getElementById('modal-chung').classList.add('an');
   }
 
-  // ==================== XÁC THỰC (UC40 - UC42) ====================
+  // ==================== XÁC THỰC NỘI BỘ ====================
   function dangXuatCucBo() {
     trangThai.maPhien = '';
     trangThai.taiKhoan = null;
@@ -140,7 +145,7 @@
     trangThai.boDemThongBao = setInterval(taiThongBao, 15000);
   }
 
-  // ==================== HỘP THÔNG BÁO (ThongBao) ====================
+  // ==================== HỘP THÔNG BÁO ====================
   async function taiThongBao() {
     const kq = await goiApi('thong-bao');
     if (!kq.thanhCong || !Array.isArray(kq.duLieu)) return;
@@ -172,12 +177,12 @@
     document.querySelectorAll('.muc-menu').forEach(b => b.classList.toggle('dang-chon', b.dataset.tab === maTab));
     const menuHienTai = (MENU_THEO_VAI_TRO[trangThai.taiKhoan.vaiTro] || []).find(m => m.ma === maTab);
     document.getElementById('tieu-de-man-hinh').textContent = menuHienTai ? menuHienTai.nhan : 'Quản trị';
-    document.getElementById('mo-ta-man-hinh').textContent = `Vai trò: ${trangThai.taiKhoan.vaiTro}`;
+    document.getElementById('mo-ta-man-hinh').textContent = `Vai trò hiện tại: ${trangThai.taiKhoan.vaiTro}`;
 
     const banDoHam = {
       'bao-cao': () => renderBaoCao(),
       'danh-muc': renderDanhMuc,
-      'dien-thoai': renderDienThoai,
+      'dien-thoai': () => renderDienThoai(false),
       'chinh-sach-gia': renderChinhSachGia,
       'duyet-phieu-nhap': () => renderPhieuNhap(true),
       'phieu-nhap': () => renderPhieuNhap(false),
@@ -201,7 +206,7 @@
     }
   }
 
-  // ==================== 1. BÁO CÁO THỐNG KÊ (UC53-56) ====================
+  // ==================== 1. BÁO CÁO & THỐNG KÊ ====================
   async function renderBaoCao(boLoc = {}) {
     const qsDt = new URLSearchParams();
     const qsDh = new URLSearchParams();
@@ -235,48 +240,58 @@
       <div class="khung-bang" style="padding:14px 18px; margin-bottom:16px;">
         <form id="form-loc-bc" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
           <div class="nhom-nhap" style="margin:0;">
-            <label>Từ ngày (UC53-55)</label>
-            <input type="date" id="bc-tu-ngay" value="${tuHienThi}" />
+            <label for="dtpTuNgay">Từ ngày</label>
+            <input type="date" id="dtpTuNgay" value="${tuHienThi}" />
           </div>
           <div class="nhom-nhap" style="margin:0;">
-            <label>Đến ngày</label>
-            <input type="date" id="bc-den-ngay" value="${denHienThi}" />
+            <label for="dtpDenNgay">Đến ngày</label>
+            <input type="date" id="dtpDenNgay" value="${denHienThi}" />
           </div>
           <div class="nhom-nhap" style="margin:0;">
-            <label>Danh mục SP bán chạy (UC55)</label>
-            <select id="bc-danh-muc">
+            <label for="cboDanhMucBaoCao">Danh mục sản phẩm bán chạy</label>
+            <select id="cboDanhMucBaoCao">
               <option value="">Tất cả danh mục</option>
               ${dsDm.map(dm => `<option value="${dm.maDanhMuc}" ${String(boLoc.maDanhMuc || '') === String(dm.maDanhMuc) ? 'selected' : ''}>${maHoaHtml(dm.ten)}</option>`).join('')}
             </select>
           </div>
-          <button type="submit" class="nut nut-chinh">Lọc thống kê</button>
+          <button type="submit" id="btnThongKe" class="nut nut-chinh">Thống kê</button>
           <button type="button" id="bc-mac-dinh" class="nut nut-phu">Tháng hiện tại</button>
         </form>
       </div>
 
       <div class="luoi-the">
         <div class="the-chi-so">
-          <div class="nhan">Doanh thu đơn giao thành công (UC53)</div>
-          <div class="gia-tri">${dinhDangTien(duLieuDt.tongDoanhThu)}</div>
+          <div class="nhan">Doanh thu đơn giao thành công</div>
+          <div class="gia-tri" id="lblTongDoanhThu">${dinhDangTien(duLieuDt.tongDoanhThu)}</div>
           <div class="chu-phu">${tuHienThi && denHienThi ? `${tuHienThi} → ${denHienThi}` : 'Tháng hiện tại'} (${duLieuDt.soDonThanhCong || 0} đơn)</div>
         </div>
-        <div class="the-chi-so"><div class="nhan">Tổng lợi nhuận ước tính</div><div class="gia-tri" style="color:#16a34a;">${dinhDangTien(duLieuDt.tongLoiNhuan)}</div></div>
-        <div class="the-chi-so"><div class="nhan">Tổng số đơn hàng (UC54)</div><div class="gia-tri">${(dh.duLieu && dh.duLieu.tongSoDon) || 0}</div><div class="chu-phu">Thành công: ${(dh.duLieu && dh.duLieu.soDonThanhCong) || 0} · Xử lý: ${(dh.duLieu && dh.duLieu.soDonDangXuLy) || 0} · Hủy: ${(dh.duLieu && dh.duLieu.soDonDaHuy) || 0}</div></div>
-        <div class="the-chi-so"><div class="nhan">Mặt hàng cần cảnh báo kho (UC56)</div><div class="gia-tri" style="color:#dc2626;">${chiTietTk.length}</div></div>
+        <div class="the-chi-so">
+          <div class="nhan">Tổng lợi nhuận gộp ước tính</div>
+          <div class="gia-tri" id="lblTongLoiNhuan" style="color:#16a34a;">${dinhDangTien(duLieuDt.tongLoiNhuan)}</div>
+        </div>
+        <div class="the-chi-so">
+          <div class="nhan">Tổng số đơn hàng</div>
+          <div class="gia-tri">${(dh.duLieu && dh.duLieu.tongSoDon) || 0}</div>
+          <div class="chu-phu">Thành công: ${(dh.duLieu && dh.duLieu.soDonThanhCong) || 0} · Đang xử lý: ${(dh.duLieu && dh.duLieu.soDonDangXuLy) || 0} · Đã hủy: ${(dh.duLieu && dh.duLieu.soDonDaHuy) || 0}</div>
+        </div>
+        <div class="the-chi-so">
+          <div class="nhan">Mặt hàng cảnh báo tồn kho</div>
+          <div class="gia-tri" style="color:#dc2626;">${chiTietTk.length}</div>
+        </div>
       </div>
 
       <div class="luoi-2-cot">
         <div class="khung-bang">
-          <div class="thanh-cong-cu"><strong>Đơn hàng theo trạng thái (UC54)</strong></div>
-          <table class="bang-du-lieu">
+          <div class="thanh-cong-cu"><strong>Thống kê đơn hàng theo trạng thái</strong></div>
+          <table class="bang-du-lieu" id="grdDonHangTheoTrangThai">
             <thead><tr><th>Trạng thái</th><th>Số lượng</th><th>Tổng giá trị</th></tr></thead>
             <tbody>${chiTietDh.map(r => `<tr><td><span class="nhan-trang-thai ${lopTrangThai(r.trangThai)}">${r.trangThai}</span></td><td>${r.soLuong}</td><td>${dinhDangTien(r.tongGiaTri)}</td></tr>`).join('') || '<tr><td colspan="3" class="rong">Chưa có dữ liệu</td></tr>'}</tbody>
           </table>
         </div>
 
         <div class="khung-bang">
-          <div class="thanh-cong-cu"><strong>Sản phẩm bán chạy — Đơn đã giao thành công (UC55)</strong></div>
-          <table class="bang-du-lieu">
+          <div class="thanh-cong-cu"><strong>Sản phẩm bán chạy (Đơn đã giao thành công)</strong></div>
+          <table class="bang-du-lieu" id="grdSanPhamBanChay">
             <thead><tr><th>Sản phẩm</th><th>Đã bán</th><th>Doanh thu</th></tr></thead>
             <tbody>${chiTietSp.map(r => `<tr><td>${maHoaHtml(r.ten)}</td><td><strong>${r.tongSoLuongBan}</strong></td><td>${dinhDangTien(r.tongDoanhThu)}</td></tr>`).join('') || '<tr><td colspan="3" class="rong">Chưa có đơn hàng giao thành công trong khoảng lọc</td></tr>'}</tbody>
           </table>
@@ -284,8 +299,8 @@
       </div>
 
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Báo cáo hàng sắp hết / vượt ngưỡng (UC56)</strong></div>
-        <table class="bang-du-lieu">
+        <div class="thanh-cong-cu"><strong>Báo cáo hàng sắp hết / vượt ngưỡng tồn kho</strong></div>
+        <table class="bang-du-lieu" id="grdHangSapHet">
           <thead><tr><th>Mã</th><th>Tên điện thoại</th><th>Tồn thực tế</th><th>Giữ chỗ</th><th>Tồn khả dụng</th><th>Mức cảnh báo</th></tr></thead>
           <tbody>${chiTietTk.map(r => `<tr><td>#${r.maDienThoai}</td><td>${maHoaHtml(r.tenDienThoai)}</td><td>${r.tonThucTe}</td><td>${r.giuCho}</td><td><strong>${r.tonKhaDung}</strong></td><td><span class="nhan-trang-thai ${lopTrangThai(r.mucDoCanhBao)}">${r.mucDoCanhBao}</span></td></tr>`).join('') || '<tr><td colspan="6" class="rong">Tồn kho ổn định</td></tr>'}</tbody>
         </table>
@@ -295,70 +310,110 @@
     document.getElementById('form-loc-bc').onsubmit = (e) => {
       e.preventDefault();
       renderBaoCao({
-        tuNgay: document.getElementById('bc-tu-ngay').value,
-        denNgay: document.getElementById('bc-den-ngay').value,
-        maDanhMuc: document.getElementById('bc-danh-muc').value,
+        tuNgay: document.getElementById('dtpTuNgay').value,
+        denNgay: document.getElementById('dtpDenNgay').value,
+        maDanhMuc: document.getElementById('cboDanhMucBaoCao').value,
       });
     };
     document.getElementById('bc-mac-dinh').onclick = () => renderBaoCao({});
   }
 
-  // ==================== 2. DANH MỤC (UC1-3) ====================
+  // ==================== 2. QUẢN LÝ DANH MỤC (Mục 3.6.1 - Bảng 173, Bảng 174) ====================
   async function renderDanhMuc() {
     const kq = await goiApi('danh-muc');
     const ds = kq.duLieu || [];
     trangThai.danhSachDanhMucCache = ds;
+    if (!ds.some(d => Number(d.maDanhMuc) === trangThai.maDanhMucDangChon)) {
+      trangThai.maDanhMucDangChon = ds[0] ? Number(ds[0].maDanhMuc) : 0;
+    }
 
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu">
-          <strong>Danh sách Danh mục (${ds.length})</strong>
-          <button type="button" class="nut nut-chinh" id="btn-them-dm">+ Thêm danh mục (UC1)</button>
+          <strong>Danh sách danh mục sản phẩm (${ds.length})</strong>
+          <div class="nhom-hanh-dong">
+            <button type="button" class="nut nut-chinh" id="btnThemDanhMuc">+ Thêm danh mục</button>
+            <button type="button" class="nut nut-phu" id="btnSua" ${ds.length === 0 ? 'disabled' : ''}>Sửa dòng chọn</button>
+            <button type="button" class="nut nut-nguy-hiem" id="btnXoa" ${ds.length === 0 ? 'disabled' : ''}>Xóa dòng chọn</button>
+          </div>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdDanhMuc">
           <thead><tr><th>Mã</th><th>Tên danh mục</th><th>Mô tả</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(dm => `
-              <tr>
+              <tr data-dong-dm="${dm.maDanhMuc}" class="${Number(dm.maDanhMuc) === trangThai.maDanhMucDangChon ? 'dong-dang-chon' : ''}">
                 <td>#${dm.maDanhMuc}</td>
                 <td><strong>${maHoaHtml(dm.ten)}</strong></td>
                 <td>${maHoaHtml(dm.moTa || '')}</td>
                 <td class="nhom-hanh-dong">
-                  <button class="nut nut-phu nut-nho" data-sua-dm="${dm.maDanhMuc}">Sửa</button>
-                  <button class="nut nut-nguy-hiem nut-nho" data-xoa-dm="${dm.maDanhMuc}">Xóa</button>
+                  <button type="button" class="nut nut-phu nut-nho" data-sua-dm="${dm.maDanhMuc}">Sửa</button>
+                  <button type="button" class="nut nut-nguy-hiem nut-nho" data-xoa-dm="${dm.maDanhMuc}">Xóa</button>
                 </td>
               </tr>
-            `).join('')}
+            `).join('') || '<tr><td colspan="4" class="rong">Chưa có danh mục nào</td></tr>'}
           </tbody>
         </table>
       </div>
     `;
 
-    document.getElementById('btn-them-dm').onclick = () => moFormDanhMuc();
+    async function xuLySuaDm(maDm) {
+      if (!maDm) return;
+      const kqCt = await goiApi('danh-muc?maDanhMuc=' + maDm);
+      if (!kqCt.thanhCong || !kqCt.duLieu) {
+        hienThongBaoToast(kqCt.thongBao || 'Không thể tải thông tin danh mục', false);
+        return;
+      }
+      moFormDanhMuc(kqCt.duLieu);
+    }
+
+    async function xuLyXoaDm(maDm) {
+      if (!maDm) return;
+      if (!confirm('Xác nhận xóa danh mục này?')) return;
+      const r = await goiApi('danh-muc?maDanhMuc=' + maDm, { method: 'DELETE' });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) renderDanhMuc();
+    }
+
+    document.querySelectorAll('[data-dong-dm]').forEach(tr => {
+      tr.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        trangThai.maDanhMucDangChon = Number(tr.dataset.dongDm);
+        document.querySelectorAll('[data-dong-dm]').forEach(r => r.classList.toggle('dong-dang-chon', Number(r.dataset.dongDm) === trangThai.maDanhMucDangChon));
+      };
+    });
+
+    document.getElementById('btnThemDanhMuc').onclick = () => moFormDanhMuc();
+    document.getElementById('btnSua').onclick = () => xuLySuaDm(trangThai.maDanhMucDangChon);
+    document.getElementById('btnXoa').onclick = () => xuLyXoaDm(trangThai.maDanhMucDangChon);
+
     document.querySelectorAll('[data-sua-dm]').forEach(b => {
-      b.onclick = () => moFormDanhMuc(ds.find(x => x.maDanhMuc == b.dataset.suaDm));
+      b.onclick = () => xuLySuaDm(Number(b.dataset.suaDm));
     });
     document.querySelectorAll('[data-xoa-dm]').forEach(b => {
-      b.onclick = async () => {
-        if (!confirm('Xác nhận xóa danh mục này?')) return;
-        const r = await goiApi('danh-muc?maDanhMuc=' + b.dataset.xoaDm, { method: 'DELETE' });
-        hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderDanhMuc();
-      };
+      b.onclick = () => xuLyXoaDm(Number(b.dataset.xoaDm));
     });
   }
 
   function moFormDanhMuc(dm = null) {
-    moModal(dm ? 'Cập nhật danh mục (UC2)' : 'Thêm danh mục mới (UC1)', `
-      <form id="form-dm">
-        <div class="nhom-nhap"><label>Tên danh mục</label><input id="dm-ten" required value="${dm ? maHoaHtml(dm.ten) : ''}" /></div>
-        <div class="nhom-nhap"><label>Mô tả</label><textarea id="dm-mota" rows="3">${dm ? maHoaHtml(dm.moTa || '') : ''}</textarea></div>
-        <button type="submit" class="nut nut-chinh nut-rong">Lưu danh mục</button>
+    moModal(dm ? 'Cập nhật danh mục' : 'Thêm danh mục mới', `
+      <form id="form-dm" novalidate>
+        <div class="nhom-nhap">
+          <label for="txtTenDanhMuc">Tên danh mục *</label>
+          <input id="txtTenDanhMuc" value="${dm ? maHoaHtml(dm.ten) : ''}" placeholder="Nhập tên danh mục..." />
+        </div>
+        <div class="nhom-nhap">
+          <label for="txtMoTa">Mô tả</label>
+          <textarea id="txtMoTa" rows="3" placeholder="Mô tả danh mục...">${dm ? maHoaHtml(dm.moTa || '') : ''}</textarea>
+        </div>
+        <button type="submit" id="${dm ? 'btnCapNhat' : 'btnLuu'}" class="nut nut-chinh nut-rong">${dm ? 'Cập nhật' : 'Lưu danh mục'}</button>
       </form>
     `);
     document.getElementById('form-dm').onsubmit = async (e) => {
       e.preventDefault();
-      const duLieu = { ten: document.getElementById('dm-ten').value, moTa: document.getElementById('dm-mota').value };
+      const duLieu = {
+        ten: document.getElementById('txtTenDanhMuc').value,
+        moTa: document.getElementById('txtMoTa').value,
+      };
       if (dm) duLieu.maDanhMuc = dm.maDanhMuc;
       const r = await goiApi('danh-muc', { method: dm ? 'PUT' : 'POST', body: JSON.stringify(duLieu) });
       hienThongBaoToast(r.thongBao, r.thanhCong);
@@ -366,24 +421,42 @@
     };
   }
 
-  // ==================== 3. ĐIỆN THOẠI (UC4-6, UC10) ====================
-  async function renderDienThoai() {
-    const [kqDt, kqDm] = await Promise.all([goiApi('dien-thoai'), goiApi('danh-muc')]);
+  // ==================== 3. QUẢN LÝ ĐIỆN THOẠI (Mục 3.6.2 - Bảng 175, Bảng 176) ====================
+  async function renderDienThoai(chiNgungKinhDoanh = false) {
+    const duongDanDt = chiNgungKinhDoanh ? 'dien-thoai/ngung-kinh-doanh' : 'dien-thoai';
+    const [kqDt, kqDm] = await Promise.all([goiApi(duongDanDt), goiApi('danh-muc')]);
     const ds = kqDt.duLieu || [];
     trangThai.danhSachSanPhamCache = ds;
     trangThai.danhSachDanhMucCache = kqDm.duLieu || [];
+    if (!ds.some(sp => Number(sp.maDienThoai) === trangThai.maDienThoaiDangChon)) {
+      trangThai.maDienThoaiDangChon = ds[0] ? Number(ds[0].maDienThoai) : 0;
+    }
+
+    const thongBaoRong = chiNgungKinhDoanh
+      ? 'Chưa có sản phẩm ngừng kinh doanh'
+      : 'Chưa có sản phẩm đang kinh doanh';
 
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
-        <div class="thanh-cong-cu">
-          <strong>Danh sách Điện thoại (${ds.length})</strong>
-          <button type="button" class="nut nut-chinh" id="btn-them-dt">+ Thêm điện thoại (UC4)</button>
+        <div class="thanh-cong-cu" style="flex-wrap:wrap; gap:10px;">
+          <strong>${chiNgungKinhDoanh ? `Danh sách điện thoại ngừng kinh doanh (${ds.length})` : `Danh sách điện thoại đang kinh doanh (${ds.length})`}</strong>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13.5px; cursor:pointer; user-select:none;">
+              <input type="checkbox" id="chkNgungKinhDoanh" ${chiNgungKinhDoanh ? 'checked' : ''} style="width:auto;" />
+              <span>Hiển thị sản phẩm ngừng kinh doanh</span>
+            </label>
+            <button type="button" class="nut nut-chinh" id="btnThemDienThoai">+ Thêm điện thoại</button>
+            <button type="button" class="nut nut-phu" id="btnSua" ${ds.length === 0 ? 'disabled' : ''}>Sửa</button>
+            ${chiNgungKinhDoanh
+              ? `<button type="button" class="nut nut-thanh-cong" id="btnKhoiPhucKinhDoanh" ${ds.length === 0 ? 'disabled' : ''}>Khôi phục kinh doanh</button>`
+              : `<button type="button" class="nut nut-nguy-hiem" id="btnXoa" ${ds.length === 0 ? 'disabled' : ''}>Xóa</button>`}
+          </div>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdDienThoai">
           <thead><tr><th>Ảnh</th><th>Tên điện thoại</th><th>Hãng</th><th>Giá vốn BQ</th><th>Giá bán</th><th>Tồn (TT/GC/KD)</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
-            ${ds.map(sp => `
-              <tr>
+            ${ds.length > 0 ? ds.map(sp => `
+              <tr data-dong-dt="${sp.maDienThoai}" class="${Number(sp.maDienThoai) === trangThai.maDienThoaiDangChon ? 'dong-dang-chon' : ''}">
                 <td><img class="anh-nho" src="${sp.hinhAnh}" alt="${maHoaHtml(sp.ten)}" /></td>
                 <td><strong>${maHoaHtml(sp.ten)}</strong><div class="chu-phu">#${sp.maDienThoai} · ${maHoaHtml(sp.tenDanhMuc)}</div></td>
                 <td>${maHoaHtml(sp.hang)}</td>
@@ -392,71 +465,165 @@
                 <td>${sp.tonKho.tonThucTe} / ${sp.tonKho.giuCho} / <strong>${sp.tonKho.tonKhaDung}</strong></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(sp.trangThai)}">${sp.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
-                  <button class="nut nut-phu nut-nho" data-sua-dt="${sp.maDienThoai}">Sửa (UC5)</button>
+                  <button type="button" class="nut nut-phu nut-nho" data-sua-dt="${sp.maDienThoai}">Sửa</button>
                   ${sp.trangThai === 'Ngừng kinh doanh'
-                    ? `<button class="nut nut-thanh-cong nut-nho" data-kp-dt="${sp.maDienThoai}">Khôi phục (UC10)</button>`
-                    : `<button class="nut nut-nguy-hiem nut-nho" data-xoa-dt="${sp.maDienThoai}">Xóa (UC6)</button>`}
+                    ? `<button type="button" class="nut nut-thanh-cong nut-nho" data-kp-dt="${sp.maDienThoai}">Khôi phục kinh doanh</button>`
+                    : `<button type="button" class="nut nut-nguy-hiem nut-nho" data-xoa-dt="${sp.maDienThoai}">Xóa</button>`}
                 </td>
               </tr>
-            `).join('')}
+            `).join('') : `<tr><td colspan="8" class="rong">${thongBaoRong}</td></tr>`}
           </tbody>
         </table>
       </div>
     `;
 
-    document.getElementById('btn-them-dt').onclick = () => moFormDienThoai(null);
+    async function xuLySuaDt(maDt) {
+      if (!maDt) return;
+      const kqCt = await goiApi('dien-thoai?maDienThoai=' + maDt);
+      if (!kqCt.thanhCong || !kqCt.duLieu) {
+        hienThongBaoToast(kqCt.thongBao || 'Không thể tải thông tin điện thoại', false);
+        return;
+      }
+      moFormDienThoai(kqCt.duLieu, chiNgungKinhDoanh);
+    }
+
+    async function xuLyXoaDt(maDt) {
+      if (!maDt) return;
+      if (!confirm('Xác nhận xóa điện thoại này?')) return;
+      const r = await goiApi('dien-thoai?maDienThoai=' + maDt, { method: 'DELETE' });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) renderDienThoai(chiNgungKinhDoanh);
+    }
+
+    async function xuLyKhoiPhucDt(maDt) {
+      if (!maDt) return;
+      const buocKiemTra = await goiApi('dien-thoai/khoi-phuc', {
+        method: 'POST',
+        body: JSON.stringify({ maDienThoai: maDt }),
+      });
+      if (!buocKiemTra.thanhCong) {
+        hienThongBaoToast(buocKiemTra.thongBao, false);
+        return;
+      }
+      if (!confirm('Xác nhận khôi phục kinh doanh sản phẩm này?')) return;
+      const r = await goiApi('dien-thoai/xac-nhan-khoi-phuc', {
+        method: 'POST',
+        body: JSON.stringify({ maDienThoai: maDt }),
+      });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) renderDienThoai(chiNgungKinhDoanh);
+    }
+
+    document.querySelectorAll('[data-dong-dt]').forEach(tr => {
+      tr.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        trangThai.maDienThoaiDangChon = Number(tr.dataset.dongDt);
+        document.querySelectorAll('[data-dong-dt]').forEach(r => r.classList.toggle('dong-dang-chon', Number(r.dataset.dongDt) === trangThai.maDienThoaiDangChon));
+      };
+    });
+
+    document.getElementById('chkNgungKinhDoanh').onchange = (e) => {
+      renderDienThoai(e.target.checked);
+    };
+    document.getElementById('btnThemDienThoai').onclick = () => moFormDienThoai(null, chiNgungKinhDoanh);
+    document.getElementById('btnSua').onclick = () => xuLySuaDt(trangThai.maDienThoaiDangChon);
+    if (document.getElementById('btnXoa')) {
+      document.getElementById('btnXoa').onclick = () => xuLyXoaDt(trangThai.maDienThoaiDangChon);
+    }
+    if (document.getElementById('btnKhoiPhucKinhDoanh')) {
+      document.getElementById('btnKhoiPhucKinhDoanh').onclick = () => xuLyKhoiPhucDt(trangThai.maDienThoaiDangChon);
+    }
+
     document.querySelectorAll('[data-sua-dt]').forEach(b => {
-      b.onclick = () => moFormDienThoai(ds.find(x => x.maDienThoai == b.dataset.suaDt));
+      b.onclick = () => xuLySuaDt(Number(b.dataset.suaDt));
     });
     document.querySelectorAll('[data-xoa-dt]').forEach(b => {
-      b.onclick = async () => {
-        if (!confirm('Xác nhận xóa điện thoại này?')) return;
-        const r = await goiApi('dien-thoai?maDienThoai=' + b.dataset.xoaDt, { method: 'DELETE' });
-        hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderDienThoai();
-      };
+      b.onclick = () => xuLyXoaDt(Number(b.dataset.xoaDt));
     });
     document.querySelectorAll('[data-kp-dt]').forEach(b => {
-      b.onclick = async () => {
-        const r = await goiApi('dien-thoai/khoi-phuc', { method: 'POST', body: JSON.stringify({ maDienThoai: Number(b.dataset.kpDt) }) });
-        hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderDienThoai();
-      };
+      b.onclick = () => xuLyKhoiPhucDt(Number(b.dataset.kpDt));
     });
   }
 
-  function moFormDienThoai(sp = null) {
+  function moFormDienThoai(sp = null, chiNgungKinhDoanh = false) {
     const ts = (sp && sp.thongSoKyThuat) ? sp.thongSoKyThuat : {};
     const optDm = trangThai.danhSachDanhMucCache
       .map(dm => `<option value="${dm.maDanhMuc}" ${sp && dm.maDanhMuc == sp.maDanhMuc ? 'selected' : ''}>${maHoaHtml(dm.ten)}</option>`)
       .join('');
 
-    moModal(sp ? `Cập nhật điện thoại #${sp.maDienThoai} (UC5)` : 'Thêm điện thoại mới (UC4)', `
-      <form id="form-dt">
-        <div class="nhom-nhap"><label>Tên điện thoại *</label><input id="dt-ten" required value="${sp ? maHoaHtml(sp.ten) : ''}" /></div>
-        <div class="luoi-2-cot">
-          <div class="nhom-nhap"><label>Danh mục *</label><select id="dt-dm">${optDm}</select></div>
-          <div class="nhom-nhap"><label>Hãng sản xuất *</label><input id="dt-hang" required value="${sp ? maHoaHtml(sp.hang) : ''}" placeholder="Apple, Samsung, Xiaomi, OPPO..." /></div>
+    const cacHangCoSan = ['Apple', 'Samsung', 'Xiaomi', 'OPPO', 'Vivo', 'Realme', 'Honor', 'Google'];
+    if (sp && sp.hang && !cacHangCoSan.includes(sp.hang)) {
+      cacHangCoSan.unshift(sp.hang);
+    }
+    const optHang = cacHangCoSan
+      .map(h => `<option value="${maHoaHtml(h)}" ${sp && sp.hang === h ? 'selected' : ''}>${maHoaHtml(h)}</option>`)
+      .join('');
+
+    const cacHdhCoSan = ['iOS 18', 'iOS 17', 'Android 15', 'Android 14', 'Xiaomi HyperOS', 'ColorOS 15', 'One UI 7'];
+    const hdhHienTai = ts.heDieuHanh || 'iOS 18';
+    if (!cacHdhCoSan.includes(hdhHienTai)) {
+      cacHdhCoSan.unshift(hdhHienTai);
+    }
+    const optHdh = cacHdhCoSan
+      .map(hdh => `<option value="${maHoaHtml(hdh)}" ${hdhHienTai === hdh ? 'selected' : ''}>${maHoaHtml(hdh)}</option>`)
+      .join('');
+
+    moModal(sp ? `Cập nhật điện thoại #${sp.maDienThoai}` : 'Thêm điện thoại mới', `
+      <form id="form-dt" novalidate>
+        <div class="nhom-nhap">
+          <label for="txtTenSanPham">Tên sản phẩm *</label>
+          <input id="txtTenSanPham" value="${sp ? maHoaHtml(sp.ten) : ''}" placeholder="VD: iPhone 17 Pro Max 256GB" />
         </div>
         <div class="luoi-2-cot">
-          <div class="nhom-nhap"><label>Giá bán (VNĐ)</label><input id="dt-gia" type="number" min="0" value="${sp ? sp.giaBan : 0}" /></div>
           <div class="nhom-nhap">
-            <label>${sp ? 'Đổi ảnh sản phẩm (tùy chọn — jpg/png/webp/gif)' : 'Ảnh sản phẩm (lưu vào uploads/)'}</label>
-            <input id="dt-anh" type="file" accept=".jpg,.jpeg,.png,.webp,.gif" />
+            <label for="cboDanhMuc">Danh mục *</label>
+            <select id="cboDanhMuc">${optDm}</select>
+          </div>
+          <div class="nhom-nhap">
+            <label for="cboHang">Hãng sản xuất *</label>
+            <select id="cboHang">${optHang}</select>
           </div>
         </div>
-        <div class="nhom-nhap"><label>Mô tả sản phẩm</label><textarea id="dt-mota" rows="2">${sp ? maHoaHtml(sp.moTa || '') : ''}</textarea></div>
-        <h4 style="margin:10px 0 6px;">Thông số kỹ thuật (ThongSoKyThuat)</h4>
-        <div class="luoi-2-cot">
-          <div class="nhom-nhap"><label>Màn hình</label><input id="dt-manhinh" value="${maHoaHtml(ts.manHinh || 'OLED 6.7 inch 120Hz')}" /></div>
-          <div class="nhom-nhap"><label>Chip xử lý</label><input id="dt-chip" value="${maHoaHtml(ts.chip || 'Apple A18 Pro')}" /></div>
-          <div class="nhom-nhap"><label>RAM (GB) *</label><input id="dt-ram" type="number" min="1" value="${ts.ram || 8}" required /></div>
-          <div class="nhom-nhap"><label>Bộ nhớ ROM (GB) *</label><input id="dt-rom" type="number" min="8" value="${ts.rom || 256}" required /></div>
-          <div class="nhom-nhap"><label>Camera</label><input id="dt-camera" value="${maHoaHtml(ts.camera || '48MP + 12MP')}" /></div>
-          <div class="nhom-nhap"><label>Dung lượng pin (mAh) *</label><input id="dt-pin" type="number" min="500" value="${ts.dungLuongPin || 4600}" required /></div>
+        <div class="nhom-nhap">
+          <label for="uplHinhAnh">${sp ? 'Tải ảnh sản phẩm mới (tùy chọn)' : 'Hình ảnh sản phẩm'}</label>
+          <input id="uplHinhAnh" type="file" accept=".jpg,.jpeg,.png,.webp,.gif" />
         </div>
-        <div class="nhom-nhap"><label>Hệ điều hành</label><input id="dt-hdh" value="${maHoaHtml(ts.heDieuHanh || 'iOS 18 / Android 15')}" /></div>
-        <button type="submit" class="nut nut-chinh nut-rong">${sp ? 'Lưu thay đổi (UC5)' : 'Lưu điện thoại mới (UC4)'}</button>
+        <div class="nhom-nhap">
+          <label for="txtMoTa">Mô tả sản phẩm</label>
+          <textarea id="txtMoTa" rows="2" placeholder="Mô tả nổi bật của điện thoại...">${sp ? maHoaHtml(sp.moTa || '') : ''}</textarea>
+        </div>
+        <h4 style="margin:10px 0 6px;">Thông số kỹ thuật</h4>
+        <div class="luoi-2-cot">
+          <div class="nhom-nhap">
+            <label for="txtManHinh">Màn hình</label>
+            <input id="txtManHinh" value="${maHoaHtml(ts.manHinh || 'OLED 6.7 inch 120Hz')}" />
+          </div>
+          <div class="nhom-nhap">
+            <label for="txtChip">Chip xử lý</label>
+            <input id="txtChip" value="${maHoaHtml(ts.chip || 'Apple A18 Pro')}" />
+          </div>
+          <div class="nhom-nhap">
+            <label for="numRAM">RAM (GB) *</label>
+            <input id="numRAM" type="number" min="1" value="${ts.ram || 8}" />
+          </div>
+          <div class="nhom-nhap">
+            <label for="numROM">Bộ nhớ ROM (GB) *</label>
+            <input id="numROM" type="number" min="8" value="${ts.rom || 256}" />
+          </div>
+          <div class="nhom-nhap">
+            <label for="txtCamera">Camera</label>
+            <input id="txtCamera" value="${maHoaHtml(ts.camera || '48MP + 12MP')}" />
+          </div>
+          <div class="nhom-nhap">
+            <label for="numDungLuongPin">Dung lượng pin (mAh) *</label>
+            <input id="numDungLuongPin" type="number" min="500" value="${ts.dungLuongPin || 4600}" />
+          </div>
+        </div>
+        <div class="nhom-nhap">
+          <label for="cboHeDieuHanh">Hệ điều hành</label>
+          <select id="cboHeDieuHanh">${optHdh}</select>
+        </div>
+        <button type="submit" id="${sp ? 'btnCapNhat' : 'btnLuu'}" class="nut nut-chinh nut-rong">${sp ? 'Cập nhật điện thoại' : 'Lưu điện thoại mới'}</button>
       </form>
     `);
 
@@ -464,30 +631,29 @@
       e.preventDefault();
       const fd = new FormData();
       if (sp) fd.append('maDienThoai', sp.maDienThoai);
-      fd.append('ten', document.getElementById('dt-ten').value.trim());
-      fd.append('maDanhMuc', document.getElementById('dt-dm').value);
-      fd.append('hang', document.getElementById('dt-hang').value.trim());
-      fd.append('giaBan', document.getElementById('dt-gia').value);
-      fd.append('moTa', document.getElementById('dt-mota').value.trim());
-      fd.append('manHinh', document.getElementById('dt-manhinh').value.trim());
-      fd.append('chip', document.getElementById('dt-chip').value.trim());
-      fd.append('ram', document.getElementById('dt-ram').value);
-      fd.append('rom', document.getElementById('dt-rom').value);
-      fd.append('camera', document.getElementById('dt-camera').value.trim());
-      fd.append('dungLuongPin', document.getElementById('dt-pin').value);
-      fd.append('heDieuHanh', document.getElementById('dt-hdh').value.trim());
+      fd.append('ten', document.getElementById('txtTenSanPham').value.trim());
+      fd.append('maDanhMuc', document.getElementById('cboDanhMuc').value);
+      fd.append('hang', document.getElementById('cboHang').value.trim());
+      fd.append('moTa', document.getElementById('txtMoTa').value.trim());
+      fd.append('manHinh', document.getElementById('txtManHinh').value.trim());
+      fd.append('chip', document.getElementById('txtChip').value.trim());
+      fd.append('ram', document.getElementById('numRAM').value);
+      fd.append('rom', document.getElementById('numROM').value);
+      fd.append('camera', document.getElementById('txtCamera').value.trim());
+      fd.append('dungLuongPin', document.getElementById('numDungLuongPin').value);
+      fd.append('heDieuHanh', document.getElementById('cboHeDieuHanh').value.trim());
 
-      const file = document.getElementById('dt-anh').files[0];
+      const file = document.getElementById('uplHinhAnh').files[0];
       if (file) fd.append('hinhAnh', file);
 
       const url = sp ? 'dien-thoai/cap-nhat' : 'dien-thoai';
       const r = await goiApi(url, { method: 'POST', body: fd });
       hienThongBaoToast(r.thongBao, r.thanhCong);
-      if (r.thanhCong) { dongModal(); renderDienThoai(); }
+      if (r.thanhCong) { dongModal(); renderDienThoai(chiNgungKinhDoanh); }
     };
   }
 
-  // ==================== 4. CHÍNH SÁCH GIÁ (UC11) ====================
+  // ==================== 4. CHÍNH SÁCH GIÁ & LỢI NHUẬN ====================
   async function renderChinhSachGia() {
     const kq = await goiApi('chinh-sach-gia');
     const dsCh = (kq.duLieu && kq.duLieu.danhSachCauHinh) || [];
@@ -495,20 +661,20 @@
 
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang" style="padding:18px;">
-        <h3 style="margin-top:0;">Cấu hình tỷ lệ lợi nhuận (UC11)</h3>
+        <h3 style="margin-top:0;">Thiết lập tỷ lệ lợi nhuận kỳ vọng</h3>
         <form id="form-gia" class="luoi-2-cot">
-          <div class="nhom-nhap"><label>Phạm vi áp dụng</label><input id="gia-phamvi" value="Toàn bộ sản phẩm" required /></div>
-          <div class="nhom-nhap"><label>Tỷ lệ lợi nhuận (%)</label><input id="gia-tyle" type="number" step="0.1" min="0" max="500" value="${dsCh[0] ? dsCh[0].tyLe : 25}" required /></div>
-          <div class="nhom-nhap"><label>Ngày áp dụng</label><input id="gia-ngay" type="date" value="${new Date().toISOString().slice(0, 10)}" /></div>
-          <div class="nhom-nhap"><label>Ghi chú</label><input id="gia-ghichu" placeholder="Lý do điều chỉnh giá..." /></div>
-          <div style="grid-column:span 2;"><button type="submit" class="nut nut-chinh">Cập nhật tỷ lệ & Tính lại giá bán</button></div>
+          <div class="nhom-nhap"><label for="cboPhamVi">Phạm vi áp dụng</label><input id="cboPhamVi" value="Toàn bộ sản phẩm" required /></div>
+          <div class="nhom-nhap"><label for="numTyLe">Tỷ lệ lợi nhuận (%)</label><input id="numTyLe" type="number" step="0.1" min="0" max="500" value="${dsCh[0] ? dsCh[0].tyLe : 25}" required /></div>
+          <div class="nhom-nhap"><label for="dtpNgayApDung">Ngày áp dụng</label><input id="dtpNgayApDung" type="date" value="${new Date().toISOString().slice(0, 10)}" /></div>
+          <div class="nhom-nhap"><label for="txtGhiChu">Ghi chú</label><input id="txtGhiChu" placeholder="Lý do điều chỉnh chính sách giá..." /></div>
+          <div style="grid-column:span 2;"><button type="submit" id="btnLuuCauHinh" class="nut nut-chinh">Cập nhật tỷ lệ & Tính lại giá bán</button></div>
         </form>
       </div>
       <div class="khung-bang">
         <div class="thanh-cong-cu"><strong>Lịch sử thay đổi cấu hình lợi nhuận</strong></div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdLichSuLoiNhuan">
           <thead><tr><th>Thời điểm</th><th>Phạm vi</th><th>Tỷ lệ (%)</th><th>Ngày áp dụng</th></tr></thead>
-          <tbody>${lichSu.map(ls => `<tr><td>${ls.thoiDiemGhi}</td><td>${maHoaHtml(ls.phamVi)}</td><td><strong>${ls.tyLe}%</strong></td><td>${ls.ngayApDung}</td></tr>`).join('')}</tbody>
+          <tbody>${lichSu.map(ls => `<tr><td>${ls.thoiDiemGhi}</td><td>${maHoaHtml(ls.phamVi)}</td><td><strong>${ls.tyLe}%</strong></td><td>${ls.ngayApDung}</td></tr>`).join('') || '<tr><td colspan="4" class="rong">Chưa có lịch sử cấu hình</td></tr>'}</tbody>
         </table>
       </div>
     `;
@@ -518,10 +684,10 @@
       const r = await goiApi('chinh-sach-gia', {
         method: 'POST',
         body: JSON.stringify({
-          phamVi: document.getElementById('gia-phamvi').value,
-          tyLe: Number(document.getElementById('gia-tyle').value),
-          ngayApDung: document.getElementById('gia-ngay').value,
-          ghiChu: document.getElementById('gia-ghichu').value,
+          phamVi: document.getElementById('cboPhamVi').value,
+          tyLe: Number(document.getElementById('numTyLe').value),
+          ngayApDung: document.getElementById('dtpNgayApDung').value,
+          ghiChu: document.getElementById('txtGhiChu').value,
         }),
       });
       hienThongBaoToast(r.thongBao, r.thanhCong);
@@ -529,7 +695,7 @@
     };
   }
 
-  // ==================== 5. PHIẾU NHẬP (UC12 - UC14) ====================
+  // ==================== 5. PHIẾU NHẬP KHO ====================
   async function renderPhieuNhap(chiDuyet, boLoc = {}) {
     const qs = new URLSearchParams();
     if (boLoc.trangThai) qs.set('trangThai', boLoc.trangThai);
@@ -546,7 +712,7 @@
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu" style="flex-wrap:wrap; gap:10px;">
-          <strong>${chiDuyet ? 'Duyệt Phiếu nhập kho (Ban Quản lý - UC13)' : 'Quản lý Phiếu nhập kho (Nhân viên Kho - UC12, UC14)'}</strong>
+          <strong>${chiDuyet ? 'Danh sách phiếu nhập kho chờ phê duyệt' : 'Quản lý & Tra cứu phiếu nhập kho'}</strong>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <select id="loc-pn-tt" style="padding:7px; border:1px solid #cbd5e1; border-radius:8px;">
               <option value="">Tất cả trạng thái</option>
@@ -554,26 +720,26 @@
             </select>
             <input type="date" id="loc-pn-tu" value="${boLoc.tuNgay || ''}" style="padding:6px; border:1px solid #cbd5e1; border-radius:8px;" />
             <input type="date" id="loc-pn-den" value="${boLoc.denNgay || ''}" style="padding:6px; border:1px solid #cbd5e1; border-radius:8px;" />
-            <button type="button" class="nut nut-phu" id="btn-loc-pn">Lọc (UC14)</button>
-            ${!chiDuyet ? '<button type="button" class="nut nut-chinh" id="btn-tao-pn">+ Lập phiếu nhập (UC12)</button>' : ''}
+            <button type="button" class="nut nut-phu" id="btn-loc-pn">Lọc phiếu nhập</button>
+            ${!chiDuyet ? '<button type="button" class="nut nut-chinh" id="btn-tao-pn">+ Lập phiếu nhập</button>' : ''}
           </div>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdPhieuNhap">
           <thead><tr><th>Mã</th><th>Nguồn nhập</th><th>Ngày nhập</th><th>Nhân viên</th><th>Chi tiết mặt hàng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(p => `
               <tr>
                 <td>#PN${p.maPhieuNhap}</td>
-                <td>${maHoaHtml(p.nguonNhap)}</td>
+                <td>${maHoaHtml(p.nguonNhap)}${p.lyDoTuChoi ? `<div class="chu-phu" style="color:#dc2626;">Lý do từ chối: ${maHoaHtml(p.lyDoTuChoi)}</div>` : ''}</td>
                 <td>${p.ngayNhap}</td>
                 <td>${maHoaHtml(p.tenNhanVien)}</td>
                 <td>${(p.chiTiet || []).map(c => `${maHoaHtml(c.tenDienThoai)} (x${c.soLuong} @ ${dinhDangTien(c.donGiaNhap)})`).join('<br>')}</td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(p.trangThai)}">${p.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
-                  ${!chiDuyet && p.trangThai === 'Nháp' ? `<button class="nut nut-chinh nut-nho" data-gui-pn="${p.maPhieuNhap}">Gửi duyệt</button>` : ''}
+                  ${!chiDuyet && p.trangThai === 'Nháp' ? `<button type="button" class="nut nut-chinh nut-nho" data-gui-pn="${p.maPhieuNhap}">Gửi duyệt</button>` : ''}
                   ${chiDuyet && p.trangThai === 'Chờ duyệt' ? `
-                    <button class="nut nut-thanh-cong nut-nho" data-duyet-pn="${p.maPhieuNhap}">Duyệt</button>
-                    <button class="nut nut-nguy-hiem nut-nho" data-tuchoi-pn="${p.maPhieuNhap}">Từ chối</button>
+                    <button type="button" class="nut nut-thanh-cong nut-nho" data-duyet-pn="${p.maPhieuNhap}">Duyệt phiếu</button>
+                    <button type="button" class="nut nut-nguy-hiem nut-nho" data-tuchoi-pn="${p.maPhieuNhap}">Từ chối</button>
                   ` : ''}
                 </td>
               </tr>
@@ -602,18 +768,18 @@
             <button type="button" class="nut nut-nguy-hiem nut-nho btn-xoa-dong-pn" title="Xóa dòng">&times;</button>
           </div>
         `;
-        moModal('Lập phiếu nhập kho nhiều mặt hàng (UC12)', `
+        moModal('Lập phiếu nhập kho mới', `
           <form id="form-pn">
             <div class="luoi-2-cot">
-              <div class="nhom-nhap"><label>Nguồn nhập / Nhà cung cấp *</label><input id="pn-nguon" required placeholder="VD: Apple Việt Nam" /></div>
-              <div class="nhom-nhap"><label>Ngày nhập *</label><input id="pn-ngay" type="date" value="${new Date().toISOString().slice(0, 10)}" required /></div>
+              <div class="nhom-nhap"><label for="txtNguonNhap">Nguồn nhập / Nhà cung cấp *</label><input id="txtNguonNhap" required placeholder="VD: Apple Việt Nam" /></div>
+              <div class="nhom-nhap"><label for="dtpNgayNhap">Ngày nhập *</label><input id="dtpNgayNhap" type="date" value="${new Date().toISOString().slice(0, 10)}" required /></div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0;">
-              <strong>Danh sách sản phẩm nhập kho</strong>
+              <strong>Danh sách mặt hàng nhập kho</strong>
               <button type="button" class="nut nut-phu nut-nho" id="btn-them-dong-pn">+ Thêm dòng sản phẩm</button>
             </div>
             <div id="ds-dong-pn">${taoDongPnHtml()}</div>
-            <button type="submit" class="nut nut-chinh nut-rong" style="margin-top:10px;">Lưu phiếu Nháp</button>
+            <button type="submit" class="nut nut-chinh nut-rong" style="margin-top:10px;">Lưu phiếu nháp</button>
           </form>
         `);
 
@@ -645,8 +811,8 @@
           const r = await goiApi('phieu-nhap', {
             method: 'POST',
             body: JSON.stringify({
-              nguonNhap: document.getElementById('pn-nguon').value.trim(),
-              ngayNhap: document.getElementById('pn-ngay').value,
+              nguonNhap: document.getElementById('txtNguonNhap').value.trim(),
+              ngayNhap: document.getElementById('dtpNgayNhap').value,
               chiTiet,
             }),
           });
@@ -673,7 +839,7 @@
     document.querySelectorAll('[data-tuchoi-pn]').forEach(b => {
       b.onclick = async () => {
         const lyDo = prompt('Nhập lý do từ chối phiếu nhập:');
-        if (!lyDo) return;
+        if (lyDo === null) return;
         const r = await goiApi('phieu-nhap/tu-choi', { method: 'POST', body: JSON.stringify({ maPhieuNhap: Number(b.dataset.tuchoiPn), lyDo }) });
         hienThongBaoToast(r.thongBao, r.thanhCong);
         if (r.thanhCong) renderPhieuNhap(true, boLoc);
@@ -681,7 +847,7 @@
     });
   }
 
-  // ==================== 6. PHIẾU XUẤT KHO (UC15 - UC17) ====================
+  // ==================== 6. PHIẾU XUẤT KHO ====================
   async function renderPhieuXuat(boLoc = {}) {
     const qs = new URLSearchParams();
     if (boLoc.trangThai) qs.set('trangThai', boLoc.trangThai);
@@ -698,9 +864,9 @@
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu">
-          <strong>Đơn hàng chờ lập phiếu xuất (${donSanSang.length})</strong>
+          <strong>Đơn hàng đã duyệt chờ lập phiếu xuất (${donSanSang.length})</strong>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdDonChoXuat">
           <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Trạng thái</th><th>Tổng tiền</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${donSanSang.map(d => `
@@ -708,7 +874,7 @@
                 <td>#DH${d.maDonHang}</td><td>${maHoaHtml(d.tenKhachHang)}</td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(d.trangThai)}">${d.trangThai}</span></td>
                 <td>${dinhDangTien(d.tongTien)}</td>
-                <td><button class="nut nut-chinh nut-nho" data-lap-px="${d.maDonHang}">Lập phiếu xuất (UC15)</button></td>
+                <td><button type="button" class="nut nut-chinh nut-nho" data-lap-px="${d.maDonHang}">Lập phiếu xuất</button></td>
               </tr>
             `).join('') || '<tr><td colspan="5" class="rong">Không có đơn hàng nào đang chờ lập phiếu xuất</td></tr>'}
           </tbody>
@@ -717,7 +883,7 @@
 
       <div class="khung-bang">
         <div class="thanh-cong-cu" style="flex-wrap:wrap; gap:10px;">
-          <strong>Danh sách Phiếu xuất kho (${dsPx.length})</strong>
+          <strong>Danh sách phiếu xuất kho (${dsPx.length})</strong>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <select id="loc-px-tt" style="padding:7px; border:1px solid #cbd5e1; border-radius:8px;">
               <option value="">Tất cả trạng thái</option>
@@ -725,10 +891,10 @@
             </select>
             <input type="date" id="loc-px-tu" value="${boLoc.tuNgay || ''}" style="padding:6px; border:1px solid #cbd5e1; border-radius:8px;" />
             <input type="date" id="loc-px-den" value="${boLoc.denNgay || ''}" style="padding:6px; border:1px solid #cbd5e1; border-radius:8px;" />
-            <button type="button" class="nut nut-phu" id="btn-loc-px">Lọc (UC17)</button>
+            <button type="button" class="nut nut-phu" id="btn-loc-px">Lọc phiếu xuất</button>
           </div>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdPhieuXuat">
           <thead><tr><th>Mã PX</th><th>Mã ĐH</th><th>Ngày lập</th><th>Chi tiết</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${dsPx.map(px => `
@@ -738,8 +904,8 @@
                 <td><span class="nhan-trang-thai ${lopTrangThai(px.trangThai)}">${px.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
                   ${px.trangThai === 'Nháp' ? `
-                    <button class="nut nut-thanh-cong nut-nho" data-xn-px="${px.maPhieuXuat}">Xác nhận xuất (UC16)</button>
-                    <button class="nut nut-nguy-hiem nut-nho" data-huy-px="${px.maPhieuXuat}">Hủy nháp</button>
+                    <button type="button" class="nut nut-thanh-cong nut-nho" data-xn-px="${px.maPhieuXuat}">Xác nhận xuất kho</button>
+                    <button type="button" class="nut nut-nguy-hiem nut-nho" data-huy-px="${px.maPhieuXuat}">Hủy nháp</button>
                   ` : ''}
                 </td>
               </tr>
@@ -782,7 +948,7 @@
     });
   }
 
-  // ==================== 7. KIỂM KÊ & NGƯỠNG TỒN KHO (UC18 - UC21) ====================
+  // ==================== 7. KIỂM KÊ & NGƯỠNG TỒN KHO ====================
   async function renderCanhBaoKho() {
     const kq = await goiApi('kiem-ke/canh-bao');
     const ds = (kq.duLieu && kq.duLieu.danhSachCanhBao) || [];
@@ -795,8 +961,8 @@
         <div class="the-chi-so"><div class="nhan">Ngưỡng tối đa</div><div class="gia-tri">${ch.nguongToiDa}</div></div>
       </div>
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Danh sách Cảnh báo Tồn kho (UC20)</strong></div>
-        <table class="bang-du-lieu">
+        <div class="thanh-cong-cu"><strong>Danh sách mặt hàng cảnh báo tồn kho</strong></div>
+        <table class="bang-du-lieu" id="grdCanhBaoTonKho">
           <thead><tr><th>Mã SP</th><th>Tên điện thoại</th><th>Tồn thực tế</th><th>Giữ chỗ</th><th>Tồn khả dụng</th><th>Loại cảnh báo</th></tr></thead>
           <tbody>${ds.map(r => `<tr><td>#${r.maDienThoai}</td><td>${maHoaHtml(r.tenDienThoai)}</td><td>${r.tonThucTe}</td><td>${r.giuCho}</td><td><strong>${r.tonKhaDung}</strong></td><td><span class="nhan-trang-thai ${lopTrangThai(r.mucDoCanhBao)}">${r.mucDoCanhBao}</span></td></tr>`).join('') || '<tr><td colspan="6" class="rong">Không có cảnh báo tồn kho</td></tr>'}</tbody>
         </table>
@@ -813,33 +979,34 @@
     document.getElementById('khung-man-hinh').innerHTML = `
       ${laBanQuanLy ? `
         <div class="khung-bang" style="padding:18px;">
-          <h3 style="margin-top:0;">Cấu hình ngưỡng cảnh báo tồn kho (UC21)</h3>
+          <h3 style="margin-top:0;">Cấu hình ngưỡng cảnh báo tồn kho</h3>
           <form id="form-nguong" class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Ngưỡng tối thiểu</label><input id="ng-min" type="number" min="0" value="${ch.nguongToiThieu}" required /></div>
-            <div class="nhom-nhap"><label>Ngưỡng sớm</label><input id="ng-som" type="number" min="1" value="${ch.nguongSom}" required /></div>
-            <div class="nhom-nhap"><label>Ngưỡng tối đa</label><input id="ng-max" type="number" min="2" value="${ch.nguongToiDa}" required /></div>
-            <div style="display:flex; align-items:flex-end; margin-bottom:12px;"><button type="submit" class="nut nut-chinh">Lưu cấu hình ngưỡng</button></div>
+            <div class="nhom-nhap"><label for="numNguongToiThieu">Ngưỡng tối thiểu</label><input id="numNguongToiThieu" type="number" min="0" value="${ch.nguongToiThieu}" required /></div>
+            <div class="nhom-nhap"><label for="numNguongSom">Ngưỡng cảnh báo sớm</label><input id="numNguongSom" type="number" min="1" value="${ch.nguongSom}" required /></div>
+            <div class="nhom-nhap"><label for="numNguongToiDa">Ngưỡng tối đa</label><input id="numNguongToiDa" type="number" min="2" value="${ch.nguongToiDa}" required /></div>
+            <div style="display:flex; align-items:flex-end; margin-bottom:12px;"><button type="submit" id="btnLuuNguong" class="nut nut-chinh">Lưu cấu hình ngưỡng</button></div>
           </form>
         </div>
       ` : ''}
 
       <div class="khung-bang">
         <div class="thanh-cong-cu">
-          <strong>Danh sách Biên bản Kiểm kê (${dsBb.length})</strong>
-          ${!laBanQuanLy ? '<button type="button" class="nut nut-chinh" id="btn-tao-kk">+ Lập biên bản kiểm kê (UC18)</button>' : ''}
+          <strong>Danh sách biên bản kiểm kê tồn kho (${dsBb.length})</strong>
+          ${!laBanQuanLy ? '<button type="button" class="nut nut-chinh" id="btn-tao-kk">+ Lập biên bản kiểm kê</button>' : ''}
         </div>
-        <table class="bang-du-lieu">
-          <thead><tr><th>Mã BB</th><th>Thời điểm</th><th>Nhân viên</th><th>Ghi chú</th><th>Chi tiết chênh lệch</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+        <table class="bang-du-lieu" id="grdBienBanKiemKe">
+          <thead><tr><th>Mã BB</th><th>Thời điểm</th><th>Nhân viên</th><th>Ghi chú</th><th>Chi tiết đối chiếu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${dsBb.map(bb => `
               <tr>
-                <td>#KK${bb.maBienBan}</td><td>${bb.thoiDiem}</td><td>${maHoaHtml(bb.tenNhanVien)}</td><td>${maHoaHtml(bb.ghiChu || '')}</td>
+                <td>#KK${bb.maBienBan}</td><td>${bb.thoiDiem}</td><td>${maHoaHtml(bb.tenNhanVien)}</td>
+                <td>${maHoaHtml(bb.ghiChu || '')}${bb.lyDoTuChoi ? `<div class="chu-phu" style="color:#dc2626;">Yêu cầu kiểm lại: ${maHoaHtml(bb.lyDoTuChoi)}</div>` : ''}</td>
                 <td>${(bb.chiTiet || []).map(c => `${maHoaHtml(c.tenDienThoai)}: HT ${c.soLuongHeThong} → TT ${c.soLuongThucTe} (Lệch ${c.chenhLech})`).join('<br>')}</td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(bb.trangThai)}">${bb.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
                   ${laBanQuanLy && bb.trangThai === 'Chờ duyệt' ? `
-                    <button class="nut nut-thanh-cong nut-nho" data-duyet-kk="${bb.maBienBan}">Duyệt (UC19)</button>
-                    <button class="nut nut-canh-bao nut-nho" data-ktra-kk="${bb.maBienBan}">Yêu cầu kiểm lại</button>
+                    <button type="button" class="nut nut-thanh-cong nut-nho" data-duyet-kk="${bb.maBienBan}">Duyệt biên bản</button>
+                    <button type="button" class="nut nut-canh-bao nut-nho" data-ktra-kk="${bb.maBienBan}">Yêu cầu kiểm lại</button>
                   ` : ''}
                 </td>
               </tr>
@@ -855,9 +1022,9 @@
         const r = await goiApi('kiem-ke/nguong-canh-bao', {
           method: 'POST',
           body: JSON.stringify({
-            nguongToiThieu: Number(document.getElementById('ng-min').value),
-            nguongSom: Number(document.getElementById('ng-som').value),
-            nguongToiDa: Number(document.getElementById('ng-max').value),
+            nguongToiThieu: Number(document.getElementById('numNguongToiThieu').value),
+            nguongSom: Number(document.getElementById('numNguongSom').value),
+            nguongToiDa: Number(document.getElementById('numNguongToiDa').value),
           }),
         });
         hienThongBaoToast(r.thongBao, r.thanhCong);
@@ -876,14 +1043,14 @@
             <button type="button" class="nut nut-nguy-hiem nut-nho btn-xoa-dong-kk" title="Xóa dòng">&times;</button>
           </div>
         `;
-        moModal('Lập biên bản kiểm kê nhiều mặt hàng (UC18)', `
+        moModal('Lập biên bản kiểm kê tồn kho', `
           <form id="form-kk">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <strong>Danh sách sản phẩm kiểm đếm</strong>
               <button type="button" class="nut nut-phu nut-nho" id="btn-them-dong-kk">+ Thêm dòng sản phẩm</button>
             </div>
             <div id="ds-dong-kk">${taoDongKkHtml()}</div>
-            <div class="nhom-nhap" style="margin-top:10px;"><label>Ghi chú giải trình (bắt buộc nếu có chênh lệch)</label><textarea id="kk-ghichu" rows="3"></textarea></div>
+            <div class="nhom-nhap" style="margin-top:10px;"><label for="kk-ghichu">Ghi chú giải trình (bắt buộc nếu phát sinh chênh lệch)</label><textarea id="kk-ghichu" rows="3"></textarea></div>
             <button type="submit" class="nut nut-chinh nut-rong">Hoàn tất biên bản kiểm kê</button>
           </form>
         `);
@@ -943,41 +1110,41 @@
     });
   }
 
-  // ==================== 8. PHÍ VẬN CHUYỂN (UC27) ====================
+  // ==================== 8. QUY TẮC PHÍ VẬN CHUYỂN ====================
   async function renderPhiVanChuyen() {
     const kq = await goiApi('phi-van-chuyen');
     const ds = kq.duLieu || [];
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu">
-          <strong>Quy tắc Phí vận chuyển (UC27)</strong>
+          <strong>Cấu hình quy tắc phí vận chuyển</strong>
           <button type="button" class="nut nut-chinh" id="btn-them-phi">+ Thêm quy tắc</button>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdQuyTacPhi">
           <thead><tr><th>Mã</th><th>Khu vực</th><th>Mức phí</th><th>Phí mặc định</th><th>Ngưỡng miễn phí</th><th>Thao tác</th></tr></thead>
-          <tbody>${ds.map(q => `<tr><td>#${q.maQuyTac}</td><td><strong>${maHoaHtml(q.khuVuc)}</strong></td><td>${dinhDangTien(q.mucPhi)}</td><td>${dinhDangTien(q.mucPhiMacDinh)}</td><td>${dinhDangTien(q.nguongMienPhi)}</td><td><button class="nut nut-phu nut-nho" data-sua-phi="${q.maQuyTac}">Sửa</button></td></tr>`).join('')}</tbody>
+          <tbody>${ds.map(q => `<tr><td>#${q.maQuyTac}</td><td><strong>${maHoaHtml(q.khuVuc)}</strong></td><td>${dinhDangTien(q.mucPhi)}</td><td>${dinhDangTien(q.mucPhiMacDinh)}</td><td>${dinhDangTien(q.nguongMienPhi)}</td><td><button type="button" class="nut nut-phu nut-nho" data-sua-phi="${q.maQuyTac}">Sửa</button></td></tr>`).join('')}</tbody>
         </table>
       </div>
     `;
     function moFormPhi(qt = null) {
-      moModal(qt ? 'Cập nhật quy tắc phí vận chuyển (UC27)' : 'Thêm quy tắc phí vận chuyển (UC27)', `
+      moModal(qt ? 'Cập nhật quy tắc phí vận chuyển' : 'Thêm quy tắc phí vận chuyển', `
         <form id="form-phi">
-          <div class="nhom-nhap"><label>Khu vực</label><input id="phi-kv" required value="${qt ? maHoaHtml(qt.khuVuc) : ''}" /></div>
+          <div class="nhom-nhap"><label for="txtKhuVuc">Khu vực</label><input id="txtKhuVuc" required value="${qt ? maHoaHtml(qt.khuVuc) : ''}" /></div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Mức phí khu vực (VNĐ)</label><input id="phi-muc" type="number" min="0" value="${qt ? qt.mucPhi : 30000}" required /></div>
-            <div class="nhom-nhap"><label>Mức phí mặc định (VNĐ)</label><input id="phi-md" type="number" min="0" value="${qt ? qt.mucPhiMacDinh : 35000}" required /></div>
+            <div class="nhom-nhap"><label for="numMucPhi">Mức phí khu vực (VNĐ)</label><input id="numMucPhi" type="number" min="0" value="${qt ? qt.mucPhi : 30000}" required /></div>
+            <div class="nhom-nhap"><label for="numMucPhiMacDinh">Mức phí mặc định (VNĐ)</label><input id="numMucPhiMacDinh" type="number" min="0" value="${qt ? qt.mucPhiMacDinh : 35000}" required /></div>
           </div>
-          <div class="nhom-nhap"><label>Ngưỡng miễn phí vận chuyển (VNĐ)</label><input id="phi-mp" type="number" min="0" value="${qt ? qt.nguongMienPhi : 10000000}" required /></div>
-          <button type="submit" class="nut nut-chinh nut-rong">Lưu quy tắc</button>
+          <div class="nhom-nhap"><label for="numNguongMienPhi">Ngưỡng miễn phí vận chuyển (VNĐ)</label><input id="numNguongMienPhi" type="number" min="0" value="${qt ? qt.nguongMienPhi : 10000000}" required /></div>
+          <button type="submit" id="btnLuuQuyTac" class="nut nut-chinh nut-rong">Lưu quy tắc</button>
         </form>
       `);
       document.getElementById('form-phi').onsubmit = async (e) => {
         e.preventDefault();
         const duLieu = {
-          khuVuc: document.getElementById('phi-kv').value.trim(),
-          mucPhi: Number(document.getElementById('phi-muc').value),
-          mucPhiMacDinh: Number(document.getElementById('phi-md').value),
-          nguongMienPhi: Number(document.getElementById('phi-mp').value),
+          khuVuc: document.getElementById('txtKhuVuc').value.trim(),
+          mucPhi: Number(document.getElementById('numMucPhi').value),
+          mucPhiMacDinh: Number(document.getElementById('numMucPhiMacDinh').value),
+          nguongMienPhi: Number(document.getElementById('numNguongMienPhi').value),
         };
         if (qt) duLieu.maQuyTac = qt.maQuyTac;
         const r = await goiApi('phi-van-chuyen', { method: 'POST', body: JSON.stringify(duLieu) });
@@ -991,7 +1158,7 @@
     });
   }
 
-  // ==================== 9. KHUYẾN MÃI & VOUCHER (UC57-64) ====================
+  // ==================== 9. QUẢN LÝ KHUYẾN MÃI & MÃ GIẢM GIÁ ====================
   async function renderKhuyenMai() {
     const [kqKm, kqDt] = await Promise.all([goiApi('khuyen-mai'), goiApi('dien-thoai')]);
     const ds = kqKm.duLieu || [];
@@ -1004,10 +1171,10 @@
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu">
-          <strong>Chương trình Khuyến mãi (UC57 - UC59)</strong>
-          <button class="nut nut-chinh" id="btn-them-km">+ Tạo khuyến mãi (UC57)</button>
+          <strong>Chương trình khuyến mãi theo sản phẩm (${ds.length})</strong>
+          <button type="button" class="nut nut-chinh" id="btn-them-km">+ Tạo chương trình khuyến mãi</button>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdKhuyenMai">
           <thead><tr><th>Mã</th><th>Tên chương trình</th><th>Ưu đãi</th><th>Sản phẩm áp dụng</th><th>Thời gian</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(km => {
@@ -1029,12 +1196,12 @@
                 <td>${km.ngayBatDau} → ${km.ngayKetThuc}<div class="chu-phu">${maHoaHtml(km.khungGio || '00:00-23:59')}</div></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(km.trangThai)}">${km.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
-                  <button class="nut nut-phu nut-nho" data-sua-km="${km.maKhuyenMai}">Sửa (UC58)</button>
-                  <button class="nut nut-canh-bao nut-nho" data-doi-km="${km.maKhuyenMai}" data-tt="${km.trangThai === 'Đang áp dụng' ? 'Ngừng áp dụng' : 'Đang áp dụng'}">${km.trangThai === 'Đang áp dụng' ? 'Ngừng' : 'Bật'}</button>
-                  <button class="nut nut-nguy-hiem nut-nho" data-xoa-km="${km.maKhuyenMai}">Xóa (UC59)</button>
+                  <button type="button" class="nut nut-phu nut-nho" data-sua-km="${km.maKhuyenMai}">Sửa</button>
+                  <button type="button" class="nut nut-canh-bao nut-nho" data-doi-km="${km.maKhuyenMai}" data-tt="${km.trangThai === 'Đang áp dụng' ? 'Ngừng áp dụng' : 'Đang áp dụng'}">${km.trangThai === 'Đang áp dụng' ? 'Ngừng' : 'Bật'}</button>
+                  <button type="button" class="nut nut-nguy-hiem nut-nho" data-xoa-km="${km.maKhuyenMai}">Xóa</button>
                 </td>
               </tr>`;
-            }).join('')}
+            }).join('') || '<tr><td colspan="7" class="rong">Chưa có chương trình khuyến mãi</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1044,7 +1211,7 @@
       const maDaChon = new Set((km && km.danhSachMaDienThoai ? km.danhSachMaDienThoai : []).map(Number));
       const dk = (km && km.dieuKienApDung) ? km.dieuKienApDung : { giaTriToiThieu: 0, nhomHang: 'Tất cả', doiTuong: 'Tất cả khách hàng' };
 
-      moModal(km ? `Cập nhật chương trình khuyến mãi #${km.maKhuyenMai} (UC58)` : 'Tạo chương trình khuyến mãi (UC57)', `
+      moModal(km ? `Cập nhật chương trình khuyến mãi #${km.maKhuyenMai}` : 'Tạo chương trình khuyến mãi mới', `
         <form id="form-km">
           <div class="nhom-nhap"><label>Tên chương trình *</label><input id="km-ten" required value="${km ? maHoaHtml(km.ten) : ''}" /></div>
           <div class="nhom-nhap"><label>Nội dung mô tả</label><input id="km-nd" value="${km ? maHoaHtml(km.noiDung || '') : ''}" /></div>
@@ -1057,7 +1224,7 @@
             <div class="nhom-nhap"><label>Ngày kết thúc *</label><input id="km-kt" type="date" value="${km ? km.ngayKetThuc : new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)}" required /></div>
           </div>
 
-          <h4 style="margin:10px 0 6px;">Điều kiện áp dụng (DieuKienApDung)</h4>
+          <h4 style="margin:10px 0 6px;">Điều kiện áp dụng</h4>
           <div class="luoi-2-cot">
             <div class="nhom-nhap"><label>Giá trị tối thiểu (VNĐ)</label><input id="km-dk-tt" type="number" min="0" value="${dk.giaTriToiThieu || 0}" /></div>
             <div class="nhom-nhap"><label>Nhóm hàng</label><input id="km-dk-nhom" value="${maHoaHtml(dk.nhomHang || 'Tất cả')}" placeholder="Tất cả / Apple / Samsung..." /></div>
@@ -1126,7 +1293,7 @@
     });
     document.querySelectorAll('[data-xoa-km]').forEach(b => {
       b.onclick = async () => {
-        if (!confirm('Xác nhận xóa chương trình khuyến mãi này (UC59)?')) return;
+        if (!confirm('Xác nhận xóa chương trình khuyến mãi này?')) return;
         const r = await goiApi('khuyen-mai?maKhuyenMai=' + b.dataset.xoaKm, { method: 'DELETE' });
         hienThongBaoToast(r.thongBao, r.thanhCong);
         if (r.thanhCong) renderKhuyenMai();
@@ -1134,33 +1301,39 @@
     });
   }
 
+  // Mục 3.6.28 - Bảng 227, Bảng 228: Quản lý mã giảm giá
   async function renderVoucher(tuKhoa = '', trangThaiLoc = '') {
     const kq = await goiApi('voucher' + (trangThaiLoc ? '?trangThai=' + encodeURIComponent(trangThaiLoc) : ''));
     const tatCa = kq.duLieu || [];
     const tk = tuKhoa.trim().toLowerCase();
     const ds = tk ? tatCa.filter(v => v.maVoucher.toLowerCase().includes(tk) || v.trangThai.toLowerCase().includes(tk)) : tatCa;
+    if (!ds.some(v => v.maVoucher === trangThai.maVoucherDangChon)) {
+      trangThai.maVoucherDangChon = ds[0] ? ds[0].maVoucher : '';
+    }
 
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu" style="flex-wrap:wrap; gap:8px;">
-          <strong>Quản lý Mã giảm giá / Voucher (UC60 - UC64)</strong>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <select id="loc-vc-tt" style="padding:7px; border:1px solid #cbd5e1; border-radius:8px;">
+          <strong>Danh sách mã giảm giá (${ds.length})</strong>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <select id="cboTrangThai" style="padding:7px; border:1px solid #cbd5e1; border-radius:8px;">
               <option value="">Tất cả trạng thái</option>
               ${['Đang hiệu lực', 'Đã khóa', 'Hết hạn'].map(tt => `<option value="${tt}" ${trangThaiLoc === tt ? 'selected' : ''}>${tt}</option>`).join('')}
             </select>
-            <input id="tim-vc" value="${maHoaHtml(tuKhoa)}" placeholder="Tra cứu mã voucher (UC61)..." style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
-            <button type="button" class="nut nut-phu" id="btn-tim-vc">Lọc / Tìm</button>
-            <button type="button" class="nut nut-chinh" id="btn-them-vc">+ Tạo Voucher (UC60)</button>
+            <input id="tim-vc" value="${maHoaHtml(tuKhoa)}" placeholder="Tra cứu mã giảm giá..." style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
+            <button type="button" class="nut nut-phu" id="btnLocXem">Lọc / Xem</button>
+            <button type="button" class="nut nut-chinh" id="btnTao">+ Tạo mã giảm giá</button>
+            <button type="button" class="nut nut-canh-bao" id="btnKhoa" ${ds.length === 0 ? 'disabled' : ''}>Khóa / Mở</button>
+            <button type="button" class="nut nut-nguy-hiem" id="btnXoa" ${ds.length === 0 ? 'disabled' : ''}>Xóa</button>
           </div>
         </div>
-        <table class="bang-du-lieu">
-          <thead><tr><th>Mã Voucher</th><th>Loại & Giá trị</th><th>Lượt dùng / Tổng (GH/KH)</th><th>Điều kiện áp dụng</th><th>Hiệu lực</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+        <table class="bang-du-lieu" id="grdQlvc">
+          <thead><tr><th>Mã giảm giá</th><th>Loại & Giá trị</th><th>Lượt dùng / Tổng</th><th>Điều kiện áp dụng</th><th>Hiệu lực</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(v => {
               const dk = v.dieuKienApDung || {};
               return `
-              <tr>
+              <tr data-dong-vc="${maHoaHtml(v.maVoucher)}" class="${v.maVoucher === trangThai.maVoucherDangChon ? 'dong-dang-chon' : ''}">
                 <td><strong>${maHoaHtml(v.maVoucher)}</strong></td>
                 <td>${v.loaiGiam}: <strong>${v.loaiGiam === 'Phần trăm' ? v.giaTriGiam + '%' : dinhDangTien(v.giaTriGiam)}</strong></td>
                 <td>${v.luotDaDung} / ${v.soLuong} <span class="chu-phu">(Tối đa ${v.gioiHanSuDung}/khách)</span></td>
@@ -1168,49 +1341,58 @@
                 <td>${v.ngayBatDau} → ${v.ngayKetThuc}</td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(v.trangThai)}">${v.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
-                  <button class="nut nut-phu nut-nho" data-sua-vc="${maHoaHtml(v.maVoucher)}">Sửa (UC62)</button>
-                  <button class="nut nut-canh-bao nut-nho" data-khoa-vc="${maHoaHtml(v.maVoucher)}" data-tt="${v.trangThai === 'Đã khóa' ? 'Đang hiệu lực' : 'Đã khóa'}">${v.trangThai === 'Đã khóa' ? 'Mở khóa' : 'Khóa (UC63)'}</button>
-                  <button class="nut nut-nguy-hiem nut-nho" data-xoa-vc="${maHoaHtml(v.maVoucher)}">Xóa (UC64)</button>
+                  <button type="button" class="nut nut-phu nut-nho" data-sua-vc="${maHoaHtml(v.maVoucher)}">Sửa</button>
+                  <button type="button" class="nut nut-canh-bao nut-nho" data-khoa-vc="${maHoaHtml(v.maVoucher)}" data-tt="${v.trangThai === 'Đã khóa' ? 'Đang hiệu lực' : 'Đã khóa'}">${v.trangThai === 'Đã khóa' ? 'Mở khóa' : 'Khóa'}</button>
+                  <button type="button" class="nut nut-nguy-hiem nut-nho" data-xoa-vc="${maHoaHtml(v.maVoucher)}">Xóa</button>
                 </td>
               </tr>`;
-            }).join('') || '<tr><td colspan="7" class="rong">Không tìm thấy voucher phù hợp</td></tr>'}
+            }).join('') || '<tr><td colspan="7" class="rong">Không tìm thấy mã giảm giá phù hợp</td></tr>'}
           </tbody>
         </table>
       </div>
     `;
 
-    document.getElementById('btn-tim-vc').onclick = () => renderVoucher(document.getElementById('tim-vc').value, document.getElementById('loc-vc-tt').value);
+    document.querySelectorAll('[data-dong-vc]').forEach(tr => {
+      tr.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        trangThai.maVoucherDangChon = tr.dataset.dongVc;
+        document.querySelectorAll('[data-dong-vc]').forEach(r => r.classList.toggle('dong-dang-chon', r.dataset.dongVc === trangThai.maVoucherDangChon));
+      };
+    });
+
+    document.getElementById('cboTrangThai').onchange = (e) => renderVoucher(document.getElementById('tim-vc').value, e.target.value);
+    document.getElementById('btnLocXem').onclick = () => renderVoucher(document.getElementById('tim-vc').value, document.getElementById('cboTrangThai').value);
 
     function moFormVc(v = null) {
       const dk = (v && v.dieuKienApDung) ? v.dieuKienApDung : { giaTriToiThieu: 0, nhomHang: 'Tất cả', doiTuong: 'Khách hàng đã đăng nhập' };
-      moModal(v ? `Cập nhật Voucher ${v.maVoucher} (UC62)` : 'Tạo mã Voucher mới (UC60)', `
-        <form id="form-vc">
+      moModal(v ? `Cập nhật mã giảm giá ${v.maVoucher}` : 'Tạo mã giảm giá mới', `
+        <form id="form-vc" novalidate>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Mã Voucher *</label><input id="vc-ma" required value="${v ? maHoaHtml(v.maVoucher) : ''}" ${v ? 'readonly' : ''} placeholder="VD: TET2027" /></div>
-            <div class="nhom-nhap"><label>Loại giảm *</label><select id="vc-loai"><option value="Số tiền" ${v && v.loaiGiam === 'Số tiền' ? 'selected' : ''}>Số tiền (VNĐ)</option><option value="Phần trăm" ${v && v.loaiGiam === 'Phần trăm' ? 'selected' : ''}>Phần trăm (%)</option></select></div>
+            <div class="nhom-nhap"><label for="txtMaVoucher">Mã giảm giá *</label><input id="txtMaVoucher" value="${v ? maHoaHtml(v.maVoucher) : ''}" ${v ? 'readonly' : ''} placeholder="VD: TET2027" /></div>
+            <div class="nhom-nhap"><label for="cboLoaiGiam">Loại giảm *</label><select id="cboLoaiGiam"><option value="Số tiền" ${v && v.loaiGiam === 'Số tiền' ? 'selected' : ''}>Số tiền (VNĐ)</option><option value="Phần trăm" ${v && v.loaiGiam === 'Phần trăm' ? 'selected' : ''}>Phần trăm (%)</option></select></div>
           </div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Giá trị giảm *</label><input id="vc-gt" type="number" min="1" value="${v ? v.giaTriGiam : 500000}" required /></div>
-            <div class="nhom-nhap"><label>Tổng số lượng phát hành *</label><input id="vc-sl" type="number" min="1" value="${v ? v.soLuong : 100}" required /></div>
+            <div class="nhom-nhap"><label for="numGiaTriGiam">Giá trị giảm *</label><input id="numGiaTriGiam" type="number" min="1" value="${v ? v.giaTriGiam : 500000}" /></div>
+            <div class="nhom-nhap"><label for="numSoLuong">Tổng số lượng phát hành *</label><input id="numSoLuong" type="number" min="1" value="${v ? v.soLuong : 100}" /></div>
           </div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Giới hạn sử dụng / mỗi khách *</label><input id="vc-gh" type="number" min="1" value="${v ? v.gioiHanSuDung : 1}" required /></div>
-            <div class="nhom-nhap"><label>Giá trị đơn tối thiểu (VNĐ)</label><input id="vc-dk-tt" type="number" min="0" value="${dk.giaTriToiThieu || 0}" /></div>
+            <div class="nhom-nhap"><label for="numGioiHan">Giới hạn sử dụng / mỗi khách *</label><input id="numGioiHan" type="number" min="1" value="${v ? v.gioiHanSuDung : 1}" /></div>
+            <div class="nhom-nhap"><label for="txtDieuKien">Giá trị đơn tối thiểu (VNĐ)</label><input id="txtDieuKien" type="number" min="0" value="${dk.giaTriToiThieu || 0}" /></div>
+          </div>
+          <div id="dtpThoiGian" class="luoi-2-cot">
+            <div class="nhom-nhap"><label for="vc-bd">Ngày bắt đầu *</label><input id="vc-bd" type="date" value="${v ? v.ngayBatDau : new Date().toISOString().slice(0, 10)}" /></div>
+            <div class="nhom-nhap"><label for="vc-kt">Ngày kết thúc *</label><input id="vc-kt" type="date" value="${v ? v.ngayKetThuc : new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)}" /></div>
           </div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Ngày bắt đầu *</label><input id="vc-bd" type="date" value="${v ? v.ngayBatDau : new Date().toISOString().slice(0, 10)}" required /></div>
-            <div class="nhom-nhap"><label>Ngày kết thúc *</label><input id="vc-kt" type="date" value="${v ? v.ngayKetThuc : new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)}" required /></div>
-          </div>
-          <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Nhóm hàng áp dụng</label><input id="vc-dk-nhom" value="${maHoaHtml(dk.nhomHang || 'Tất cả')}" placeholder="Tất cả / Apple / Samsung..." /></div>
+            <div class="nhom-nhap"><label for="vc-dk-nhom">Nhóm hàng áp dụng</label><input id="vc-dk-nhom" value="${maHoaHtml(dk.nhomHang || 'Tất cả')}" placeholder="Tất cả / Apple / Samsung..." /></div>
             <div class="nhom-nhap">
-              <label>Đối tượng áp dụng</label>
+              <label for="vc-dk-dt">Đối tượng áp dụng</label>
               <select id="vc-dk-dt">
                 ${['Tất cả khách hàng', 'Khách hàng đã đăng nhập', 'Khách hàng mới'].map(dt => `<option value="${dt}" ${dk.doiTuong === dt ? 'selected' : ''}>${dt}</option>`).join('')}
               </select>
             </div>
           </div>
-          <button type="submit" class="nut nut-chinh nut-rong">Lưu Voucher</button>
+          <button type="submit" id="${v ? 'btnCapNhat' : 'btnTao'}" class="nut nut-chinh nut-rong">${v ? 'Cập nhật mã giảm giá' : 'Tạo mã giảm giá'}</button>
         </form>
       `);
       document.getElementById('form-vc').onsubmit = async (e) => {
@@ -1218,15 +1400,15 @@
         const r = await goiApi('voucher', {
           method: v ? 'PUT' : 'POST',
           body: JSON.stringify({
-            maVoucher: document.getElementById('vc-ma').value.trim(),
-            loaiGiam: document.getElementById('vc-loai').value,
-            giaTriGiam: Number(document.getElementById('vc-gt').value),
-            soLuong: Number(document.getElementById('vc-sl').value),
-            gioiHanSuDung: Number(document.getElementById('vc-gh').value),
+            maVoucher: document.getElementById('txtMaVoucher').value.trim(),
+            loaiGiam: document.getElementById('cboLoaiGiam').value,
+            giaTriGiam: Number(document.getElementById('numGiaTriGiam').value),
+            soLuong: Number(document.getElementById('numSoLuong').value),
+            gioiHanSuDung: Number(document.getElementById('numGioiHan').value),
             ngayBatDau: document.getElementById('vc-bd').value,
             ngayKetThuc: document.getElementById('vc-kt').value,
             dieuKienApDung: {
-              giaTriToiThieu: Number(document.getElementById('vc-dk-tt').value || 0),
+              giaTriToiThieu: Number(document.getElementById('txtDieuKien').value || 0),
               nhomHang: document.getElementById('vc-dk-nhom').value.trim() || 'Tất cả',
               doiTuong: document.getElementById('vc-dk-dt').value,
             },
@@ -1237,114 +1419,201 @@
       };
     }
 
-    document.getElementById('btn-them-vc').onclick = () => moFormVc();
+    async function xuLySuaVc(maVc) {
+      if (!maVc) return;
+      const kqCt = await goiApi('voucher?maVoucher=' + encodeURIComponent(maVc));
+      if (!kqCt.thanhCong || !kqCt.duLieu) {
+        hienThongBaoToast(kqCt.thongBao || 'Không thể tải thông tin mã giảm giá', false);
+        return;
+      }
+      moFormVc(kqCt.duLieu);
+    }
+
+    async function xuLyKhoaVc(maVc, ttMoi = null) {
+      if (!maVc) return;
+      const vcObj = ds.find(x => x.maVoucher === maVc);
+      const trangThaiDich = ttMoi || (vcObj && vcObj.trangThai === 'Đã khóa' ? 'Đang hiệu lực' : 'Đã khóa');
+      const r = await goiApi('voucher', { method: 'PATCH', body: JSON.stringify({ maVoucher: maVc, trangThai: trangThaiDich }) });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) renderVoucher(tuKhoa, trangThaiLoc);
+    }
+
+    async function xuLyXoaVc(maVc) {
+      if (!maVc) return;
+      if (!confirm('Xác nhận xóa mã giảm giá này?')) return;
+      const r = await goiApi('voucher?maVoucher=' + encodeURIComponent(maVc), { method: 'DELETE' });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) renderVoucher(tuKhoa, trangThaiLoc);
+    }
+
+    document.getElementById('btnTao').onclick = () => moFormVc();
+    document.getElementById('btnKhoa').onclick = () => xuLyKhoaVc(trangThai.maVoucherDangChon);
+    document.getElementById('btnXoa').onclick = () => xuLyXoaVc(trangThai.maVoucherDangChon);
+
     document.querySelectorAll('[data-sua-vc]').forEach(b => {
-      b.onclick = () => moFormVc(tatCa.find(x => x.maVoucher === b.dataset.suaVc));
+      b.onclick = () => xuLySuaVc(b.dataset.suaVc);
     });
     document.querySelectorAll('[data-khoa-vc]').forEach(b => {
-      b.onclick = async () => {
-        const r = await goiApi('voucher', { method: 'PATCH', body: JSON.stringify({ maVoucher: b.dataset.khoaVc, trangThai: b.dataset.tt }) });
-        hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderVoucher(tuKhoa, trangThaiLoc);
-      };
+      b.onclick = () => xuLyKhoaVc(b.dataset.khoaVc, b.dataset.tt);
     });
     document.querySelectorAll('[data-xoa-vc]').forEach(b => {
-      b.onclick = async () => {
-        if (!confirm('Xóa voucher này (chỉ thành công khi chưa có lượt dùng)?')) return;
-        const r = await goiApi('voucher?maVoucher=' + encodeURIComponent(b.dataset.xoaVc), { method: 'DELETE' });
-        hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderVoucher(tuKhoa, trangThaiLoc);
-      };
+      b.onclick = () => xuLyXoaVc(b.dataset.xoaVc);
     });
   }
 
-  // ==================== 10. QUẢN LÝ TÀI KHOẢN (UC48-52) ====================
+  // ==================== 10. QUẢN LÝ TÀI KHOẢN (Mục 3.6.22 - Bảng 215, Bảng 216) ====================
   async function renderTaiKhoan(tuKhoa = '') {
     const kq = await goiApi('tai-khoan' + (tuKhoa.trim() ? '?tuKhoa=' + encodeURIComponent(tuKhoa.trim()) : ''));
     const ds = kq.duLieu || [];
+    if (!ds.some(t => Number(t.maTaiKhoan) === trangThai.maTaiKhoanDangChon)) {
+      trangThai.maTaiKhoanDangChon = ds[0] ? Number(ds[0].maTaiKhoan) : 0;
+    }
 
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu" style="flex-wrap:wrap; gap:8px;">
-          <strong>Danh sách Tài khoản (${ds.length})</strong>
-          <div style="display:flex; gap:8px;">
-            <input id="tim-tk" value="${maHoaHtml(tuKhoa)}" placeholder="Tìm tài khoản (UC48)..." style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
-            <button type="button" class="nut nut-phu" id="btn-tim-tk">Tìm</button>
-            <button type="button" class="nut nut-chinh" id="btn-tao-nv">+ Tạo tài khoản Nhân viên (UC51)</button>
+          <strong>Danh sách tài khoản (${ds.length})</strong>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input id="txtTuKhoa" value="${maHoaHtml(tuKhoa)}" placeholder="Tìm theo tên, email, SĐT..." style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
+            <button type="button" class="nut nut-phu" id="btnTimKiem">Tìm kiếm</button>
+            <button type="button" class="nut nut-chinh" id="btnTaoNhanVien">+ Tạo tài khoản nhân viên</button>
+            <button type="button" class="nut nut-nguy-hiem" id="btnKhoa" ${ds.length === 0 ? 'disabled' : ''}>Khóa</button>
+            <button type="button" class="nut nut-thanh-cong" id="btnMoKhoa" ${ds.length === 0 ? 'disabled' : ''}>Mở khóa</button>
           </div>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdQltk">
           <thead><tr><th>Mã</th><th>Định danh</th><th>Họ tên & SĐT</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(tk => `
-              <tr>
+              <tr data-dong-tk="${tk.maTaiKhoan}" class="${Number(tk.maTaiKhoan) === trangThai.maTaiKhoanDangChon ? 'dong-dang-chon' : ''}">
                 <td>#${tk.maTaiKhoan}</td>
                 <td>${maHoaHtml(tk.dinhDanh)}</td>
-                <td><strong>${maHoaHtml(tk.hoTen)}</strong>${tk.soDienThoai ? `<div class="chu-phu">${maHoaHtml(tk.soDienThoai)}</div>` : ''}</td>
+                <td>
+                  <strong>${maHoaHtml(tk.hoTen)}</strong>
+                  ${tk.soDienThoai ? `<div class="chu-phu">${maHoaHtml(tk.soDienThoai)}</div>` : ''}
+                  ${tk.lyDoKhoa ? `<div class="chu-phu" style="color:#dc2626;">Lý do khóa: ${maHoaHtml(tk.lyDoKhoa)}</div>` : ''}
+                </td>
                 <td><span class="nhan-trang-thai tt-lam">${tk.vaiTro}</span></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(tk.trangThai)}">${tk.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
-                  ${tk.vaiTro !== 'Khách hàng' ? `<button class="nut nut-phu nut-nho" data-sua-nv="${tk.maTaiKhoan}">Sửa NV / Vai trò (UC52)</button>` : ''}
-                  <button class="nut ${tk.trangThai === 'Hoạt động' ? 'nut-nguy-hiem' : 'nut-thanh-cong'} nut-nho" data-khoa-tk="${tk.maTaiKhoan}" data-hd="${tk.trangThai === 'Hoạt động' ? '1' : '0'}">${tk.trangThai === 'Hoạt động' ? 'Khóa (UC49)' : 'Mở khóa (UC50)'}</button>
+                  ${['Nhân viên Kho', 'Nhân viên Bán hàng / CSKH'].includes(tk.vaiTro) ? `<button type="button" class="nut nut-phu nut-nho" data-sua-nv="${tk.maTaiKhoan}">Sửa nhân viên</button>` : ''}
+                  <button type="button" class="nut ${tk.trangThai === 'Hoạt động' ? 'nut-nguy-hiem' : 'nut-thanh-cong'} nut-nho" data-khoa-tk="${tk.maTaiKhoan}" data-hd="${tk.trangThai === 'Hoạt động' ? '1' : '0'}">${tk.trangThai === 'Hoạt động' ? 'Khóa' : 'Mở khóa'}</button>
                 </td>
               </tr>
-            `).join('')}
+            `).join('') || '<tr><td colspan="6" class="rong">Không tìm thấy tài khoản phù hợp</td></tr>'}
           </tbody>
         </table>
       </div>
     `;
 
-    document.getElementById('btn-tim-tk').onclick = () => renderTaiKhoan(document.getElementById('tim-tk').value);
+    document.querySelectorAll('[data-dong-tk]').forEach(tr => {
+      tr.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        trangThai.maTaiKhoanDangChon = Number(tr.dataset.dongTk);
+        document.querySelectorAll('[data-dong-tk]').forEach(r => r.classList.toggle('dong-dang-chon', Number(r.dataset.dongTk) === trangThai.maTaiKhoanDangChon));
+      };
+    });
+
+    document.getElementById('btnTimKiem').onclick = () => renderTaiKhoan(document.getElementById('txtTuKhoa').value);
+    document.getElementById('txtTuKhoa').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        renderTaiKhoan(document.getElementById('txtTuKhoa').value);
+      }
+    });
+
+    function moModalKhoaTk(maTk) {
+      if (!maTk) return;
+      moModal(`Khóa tài khoản #${maTk}`, `
+        <form id="form-khoa-tk" novalidate>
+          <div class="nhom-nhap">
+            <label for="txtLyDoKhoa">Lý do khóa tài khoản *</label>
+            <textarea id="txtLyDoKhoa" rows="3" placeholder="Nhập lý do khóa tài khoản...">Vi phạm quy định hoạt động của hệ thống</textarea>
+          </div>
+          <button type="submit" id="btnXacNhanKhoa" class="nut nut-nguy-hiem nut-rong">Xác nhận khóa tài khoản</button>
+        </form>
+      `);
+      document.getElementById('form-khoa-tk').onsubmit = async (e) => {
+        e.preventDefault();
+        const lyDoKhoa = document.getElementById('txtLyDoKhoa').value.trim();
+        const r = await goiApi('tai-khoan/khoa', {
+          method: 'PATCH',
+          body: JSON.stringify({ maTaiKhoan: maTk, khoa: true, lyDoKhoa }),
+        });
+        hienThongBaoToast(r.thongBao, r.thanhCong);
+        if (r.thanhCong) { dongModal(); renderTaiKhoan(tuKhoa); }
+      };
+    }
+
+    async function xuLyMoKhoaTk(maTk) {
+      if (!maTk) return;
+      const r = await goiApi('tai-khoan/mo-khoa', {
+        method: 'PATCH',
+        body: JSON.stringify({ maTaiKhoan: maTk }),
+      });
+      hienThongBaoToast(r.thongBao, r.thanhCong);
+      if (r.thanhCong) renderTaiKhoan(tuKhoa);
+    }
+
+    document.getElementById('btnKhoa').onclick = () => moModalKhoaTk(trangThai.maTaiKhoanDangChon);
+    document.getElementById('btnMoKhoa').onclick = () => xuLyMoKhoaTk(trangThai.maTaiKhoanDangChon);
 
     document.querySelectorAll('[data-sua-nv]').forEach(b => {
-      b.onclick = () => {
-        const tkObj = ds.find(x => x.maTaiKhoan == b.dataset.suaNv);
-        if (!tkObj) return;
-        moModal(`Cập nhật Nhân viên #${tkObj.maTaiKhoan} (UC52)`, `
-          <form id="form-vt">
-            <div class="nhom-nhap"><label>Họ và tên nhân viên *</label><input id="nv-sua-ten" required value="${maHoaHtml(tkObj.hoTen || '')}" /></div>
-            <div class="nhom-nhap"><label>Số điện thoại</label><input id="nv-sua-sdt" value="${maHoaHtml(tkObj.soDienThoai || '')}" /></div>
-            <div class="nhom-nhap"><label>Vai trò nội bộ *</label>
-              <select id="vt-moi">
-                <option value="Ban Quản lý" ${tkObj.vaiTro === 'Ban Quản lý' ? 'selected' : ''}>Ban Quản lý</option>
+      b.onclick = async () => {
+        const kqNv = await goiApi('tai-khoan/nhan-vien?maTaiKhoan=' + b.dataset.suaNv);
+        if (!kqNv.thanhCong || !kqNv.duLieu) {
+          hienThongBaoToast(kqNv.thongBao || 'Không thể tải thông tin nhân viên', false);
+          return;
+        }
+        const tkObj = kqNv.duLieu;
+        moModal(`Cập nhật thông tin nhân viên #${tkObj.maTaiKhoan}`, `
+          <form id="form-vt" novalidate>
+            <div class="nhom-nhap"><label for="txtHoTen">Họ và tên nhân viên *</label><input id="txtHoTen" value="${maHoaHtml(tkObj.hoTen || '')}" /></div>
+            <div class="nhom-nhap"><label for="txtSoDienThoai">Số điện thoại</label><input id="txtSoDienThoai" value="${maHoaHtml(tkObj.soDienThoai || '')}" /></div>
+            <div class="nhom-nhap"><label for="cboVaiTro">Vai trò nhân viên *</label>
+              <select id="cboVaiTro">
                 <option value="Nhân viên Kho" ${tkObj.vaiTro === 'Nhân viên Kho' ? 'selected' : ''}>Nhân viên Kho</option>
                 <option value="Nhân viên Bán hàng / CSKH" ${tkObj.vaiTro === 'Nhân viên Bán hàng / CSKH' ? 'selected' : ''}>Nhân viên Bán hàng / CSKH</option>
               </select>
             </div>
-            <p class="chu-phu">Lưu ý (UC52): Nếu đổi vai trò, toàn bộ phiên đăng nhập hiện tại của nhân viên này sẽ tự động bị thu hồi.</p>
-            <button type="submit" class="nut nut-chinh nut-rong">Lưu thông tin nhân viên</button>
+            <p class="chu-phu">Khi đổi vai trò, toàn bộ phiên đăng nhập hiện tại của nhân viên sẽ tự động được thu hồi để áp dụng quyền mới.</p>
+            <button type="submit" id="btnCapNhatNhanVien" class="nut nut-chinh nut-rong">Cập nhật nhân viên</button>
           </form>
         `);
         document.getElementById('form-vt').onsubmit = async (e) => {
           e.preventDefault();
-          const r = await goiApi('tai-khoan/nhan-vien', {
-            method: 'PUT',
-            body: JSON.stringify({
-              maTaiKhoan: tkObj.maTaiKhoan,
-              hoTen: document.getElementById('nv-sua-ten').value.trim(),
-              soDienThoai: document.getElementById('nv-sua-sdt').value.trim(),
-              vaiTro: document.getElementById('vt-moi').value,
-            }),
-          });
+          const payload = {
+            maTaiKhoan: tkObj.maTaiKhoan,
+            hoTen: document.getElementById('txtHoTen').value.trim(),
+            soDienThoai: document.getElementById('txtSoDienThoai').value.trim(),
+            vaiTro: document.getElementById('cboVaiTro').value,
+            xacNhanDoiVaiTro: false,
+          };
+          let r = await goiApi('tai-khoan/nhan-vien', { method: 'PUT', body: JSON.stringify(payload) });
+          if (!r.thanhCong && r.duLieu && r.duLieu.canhBaoMatQuyen) {
+            if (!confirm(r.thongBao)) return;
+            payload.xacNhanDoiVaiTro = true;
+            r = await goiApi('tai-khoan/nhan-vien', { method: 'PUT', body: JSON.stringify(payload) });
+          }
           hienThongBaoToast(r.thongBao, r.thanhCong);
           if (r.thanhCong) { dongModal(); renderTaiKhoan(tuKhoa); }
         };
       };
     });
 
-    document.getElementById('btn-tao-nv').onclick = () => {
-      moModal('Tạo tài khoản Nhân viên (UC51)', `
-        <form id="form-nv">
-          <div class="nhom-nhap"><label>Định danh đăng nhập (Email/SĐT) *</label><input id="nv-dd" required /></div>
+    document.getElementById('btnTaoNhanVien').onclick = () => {
+      moModal('Tạo tài khoản nhân viên mới', `
+        <form id="form-nv" novalidate>
+          <div class="nhom-nhap"><label for="txtEmail">Định danh đăng nhập (Email) *</label><input id="txtEmail" placeholder="VD: nhanvienmoi@phonestore.vn" /></div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Họ tên nhân viên *</label><input id="nv-ten" required /></div>
-            <div class="nhom-nhap"><label>Số điện thoại</label><input id="nv-sdt" /></div>
+            <div class="nhom-nhap"><label for="txtHoTen">Họ tên nhân viên *</label><input id="txtHoTen" placeholder="Nhập họ tên..." /></div>
+            <div class="nhom-nhap"><label for="txtSoDienThoai">Số điện thoại</label><input id="txtSoDienThoai" placeholder="09xxxxxxxx" /></div>
           </div>
           <div class="luoi-2-cot">
-            <div class="nhom-nhap"><label>Vai trò nội bộ</label><select id="nv-vt"><option value="Nhân viên Kho">Nhân viên Kho</option><option value="Nhân viên Bán hàng / CSKH">Nhân viên Bán hàng / CSKH</option><option value="Ban Quản lý">Ban Quản lý</option></select></div>
-            <div class="nhom-nhap"><label>Mật khẩu khởi tạo</label><input id="nv-mk" type="password" value="123456" minlength="6" required /></div>
+            <div class="nhom-nhap"><label for="cboVaiTro">Vai trò nội bộ *</label><select id="cboVaiTro"><option value="Nhân viên Kho">Nhân viên Kho</option><option value="Nhân viên Bán hàng / CSKH">Nhân viên Bán hàng / CSKH</option></select></div>
+            <div class="nhom-nhap"><label for="pwdMatKhauTam">Mật khẩu tạm thời *</label><input id="pwdMatKhauTam" type="password" minlength="6" placeholder="Tối thiểu 6 ký tự" /></div>
           </div>
-          <button type="submit" class="nut nut-chinh nut-rong">Tạo tài khoản</button>
+          <button type="submit" id="btnLuuNhanVien" class="nut nut-chinh nut-rong">Tạo tài khoản nhân viên</button>
         </form>
       `);
       document.getElementById('form-nv').onsubmit = async (e) => {
@@ -1352,11 +1621,11 @@
         const r = await goiApi('tai-khoan', {
           method: 'POST',
           body: JSON.stringify({
-            dinhDanh: document.getElementById('nv-dd').value.trim(),
-            hoTen: document.getElementById('nv-ten').value.trim(),
-            soDienThoai: document.getElementById('nv-sdt').value.trim(),
-            vaiTro: document.getElementById('nv-vt').value,
-            matKhau: document.getElementById('nv-mk').value,
+            email: document.getElementById('txtEmail').value.trim(),
+            hoTen: document.getElementById('txtHoTen').value.trim(),
+            soDienThoai: document.getElementById('txtSoDienThoai').value.trim(),
+            vaiTro: document.getElementById('cboVaiTro').value,
+            matKhauTam: document.getElementById('pwdMatKhauTam').value,
           }),
         });
         hienThongBaoToast(r.thongBao, r.thanhCong);
@@ -1365,42 +1634,44 @@
     };
 
     document.querySelectorAll('[data-khoa-tk]').forEach(b => {
-      b.onclick = async () => {
-        const khoa = b.dataset.hd === '1';
-        const lyDoKhoa = khoa ? prompt('Nhập lý do khóa tài khoản:') : null;
-        if (khoa && lyDoKhoa === null) return;
-        const url = khoa ? 'tai-khoan/khoa' : 'tai-khoan/mo-khoa';
-        const r = await goiApi(url, { method: 'PATCH', body: JSON.stringify({ maTaiKhoan: Number(b.dataset.khoaTk), khoa, lyDoKhoa }) });
-        hienThongBaoToast(r.thongBao, r.thanhCong);
-        if (r.thanhCong) renderTaiKhoan(tuKhoa);
+      b.onclick = () => {
+        const maTk = Number(b.dataset.khoaTk);
+        if (b.dataset.hd === '1') {
+          moModalKhoaTk(maTk);
+        } else {
+          xuLyMoKhoaTk(maTk);
+        }
       };
     });
   }
 
-  // ==================== 11. ĐƠN HÀNG (UC33-34 - CSKH) ====================
+  // ==================== 11. QUẢN LÝ ĐƠN HÀNG ====================
   async function renderDonHang() {
     const kq = await goiApi('don-hang');
     const ds = kq.duLieu || [];
 
     function nutChuyenTiep(dh) {
-      if (dh.trangThai === 'Chờ duyệt') return `<button class="nut nut-thanh-cong nut-nho" data-dh="${dh.maDonHang}" data-tt="Đã duyệt">Duyệt đơn (UC33)</button>`;
-      if (dh.trangThai === 'Đã duyệt') return `<button class="nut nut-chinh nut-nho" data-dh="${dh.maDonHang}" data-tt="Đang đóng gói">Chuyển Đang đóng gói</button>`;
-      if (dh.trangThai === 'Đang đóng gói') return `<span class="chu-phu">Chờ Kho xuất hàng (UC16)</span>`;
-      if (dh.trangThai === 'Đã giao shipper') return `<button class="nut nut-chinh nut-nho" data-dh="${dh.maDonHang}" data-tt="Đang giao">Bắt đầu giao (UC34)</button>`;
-      if (dh.trangThai === 'Đang giao') return `<button class="nut nut-thanh-cong nut-nho" data-dh="${dh.maDonHang}" data-tt="Đã giao thành công">Giao thành công</button>`;
+      if (dh.trangThai === 'Chờ duyệt') return `<button type="button" class="nut nut-thanh-cong nut-nho" data-dh="${dh.maDonHang}" data-tt="Đã duyệt">Duyệt đơn hàng</button>`;
+      if (dh.trangThai === 'Đã duyệt') return `<button type="button" class="nut nut-chinh nut-nho" data-dh="${dh.maDonHang}" data-tt="Đang đóng gói">Chuyển Đang đóng gói</button>`;
+      if (dh.trangThai === 'Đang đóng gói') return `<span class="chu-phu">Chờ Kho xác nhận xuất hàng</span>`;
+      if (dh.trangThai === 'Đã giao shipper') return `<button type="button" class="nut nut-chinh nut-nho" data-dh="${dh.maDonHang}" data-tt="Đang giao">Bắt đầu giao hàng</button>`;
+      if (dh.trangThai === 'Đang giao') return `<button type="button" class="nut nut-thanh-cong nut-nho" data-dh="${dh.maDonHang}" data-tt="Đã giao thành công">Giao thành công</button>`;
       return '';
     }
 
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Quản lý Đơn hàng & Tiến độ giao hàng (UC33 - UC34)</strong></div>
-        <table class="bang-du-lieu">
-          <thead><tr><th>Mã ĐH</th><th>Khách hàng</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Thanh toán</th><th>Phiếu xuất</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+        <div class="thanh-cong-cu"><strong>Quản lý đơn hàng & Cập nhật tiến độ giao hàng</strong></div>
+        <table class="bang-du-lieu" id="grdDonHang">
+          <thead><tr><th>Mã ĐH</th><th>Người nhận</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Thanh toán</th><th>Phiếu xuất</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(dh => `
               <tr>
                 <td><strong>#DH${dh.maDonHang}</strong></td>
-                <td>${maHoaHtml(dh.tenKhachHang)}<div class="chu-phu">${maHoaHtml(dh.soDienThoai || '')}</div></td>
+                <td>
+                  <strong>${maHoaHtml(dh.tenNguoiNhan || dh.nguoiNhan || dh.tenKhachHang)}</strong>
+                  <div class="chu-phu">${maHoaHtml(dh.sdtNguoiNhan || dh.soDienThoai || '')} · ${maHoaHtml(dh.diaChiNhan || dh.diaChiGiaoHang || '')}</div>
+                </td>
                 <td>${dh.ngayDat}</td>
                 <td><strong>${dinhDangTien(dh.tongTien)}</strong></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(dh.trangThaiThanhToan)}">${dh.trangThaiThanhToan}</span></td>
@@ -1408,7 +1679,7 @@
                 <td><span class="nhan-trang-thai ${lopTrangThai(dh.trangThai)}">${dh.trangThai}</span></td>
                 <td>${nutChuyenTiep(dh)}</td>
               </tr>
-            `).join('')}
+            `).join('') || '<tr><td colspan="8" class="rong">Chưa có đơn hàng</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1423,14 +1694,14 @@
     });
   }
 
-  // ==================== 12. HỦY ĐƠN & HOÀN TIỀN (UC35-38 - CSKH) ====================
+  // ==================== 12. YÊU CẦU HỦY ĐƠN & HOÀN TIỀN ====================
   async function renderHuyDon() {
     const kq = await goiApi('huy-don');
     const ds = kq.duLieu || [];
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
-        <div class="thanh-cong-cu"><strong>Yêu cầu Hủy đơn & Hoàn tiền mô phỏng (UC35 - UC38)</strong></div>
-        <table class="bang-du-lieu">
+        <div class="thanh-cong-cu"><strong>Tiếp nhận yêu cầu hủy đơn & Xử lý hoàn tiền</strong></div>
+        <table class="bang-du-lieu" id="grdYeuCauHuy">
           <thead><tr><th>Mã YC</th><th>Đơn hàng</th><th>Khách hàng</th><th>Lý do hủy</th><th>TT Đơn / TT Thanh toán</th><th>Trạng thái YC</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(yc => `
@@ -1438,15 +1709,15 @@
                 <td>#YC${yc.maYeuCau}</td>
                 <td>#DH${yc.maDonHang}<div class="chu-phu">${dinhDangTien(yc.soTienThanhToan || yc.tongTien)}</div></td>
                 <td>${maHoaHtml(yc.tenKhachHang)}</td>
-                <td>${maHoaHtml(yc.lyDo)}</td>
+                <td>${maHoaHtml(yc.lyDo)}${yc.lyDoTuChoi ? `<div class="chu-phu" style="color:#dc2626;">Từ chối: ${maHoaHtml(yc.lyDoTuChoi)}</div>` : ''}</td>
                 <td>${yc.trangThaiDonHang} / <strong>${yc.trangThaiThanhToan}</strong></td>
                 <td><span class="nhan-trang-thai ${lopTrangThai(yc.trangThai)}">${yc.trangThai}</span></td>
                 <td class="nhom-hanh-dong">
                   ${yc.trangThai === 'Chờ xử lý' ? `
-                    <button class="nut nut-thanh-cong nut-nho" data-xl-yc="${yc.maYeuCau}" data-cn="1">Xác nhận hủy (UC36)</button>
-                    <button class="nut nut-nguy-hiem nut-nho" data-xl-yc="${yc.maYeuCau}" data-cn="0">Từ chối (UC37)</button>
+                    <button type="button" class="nut nut-thanh-cong nut-nho" data-xl-yc="${yc.maYeuCau}" data-cn="1">Xác nhận hủy</button>
+                    <button type="button" class="nut nut-nguy-hiem nut-nho" data-xl-yc="${yc.maYeuCau}" data-cn="0">Từ chối</button>
                   ` : ''}
-                  ${['Cần hoàn tiền', 'Hoàn tiền lỗi'].includes(yc.trangThaiThanhToan) ? `<button class="nut nut-chinh nut-nho" data-hoan-tien="${yc.maDonHang}">Hoàn tiền (UC38)</button>` : ''}
+                  ${['Cần hoàn tiền', 'Hoàn tiền lỗi'].includes(yc.trangThaiThanhToan) ? `<button type="button" class="nut nut-chinh nut-nho" data-hoan-tien="${yc.maDonHang}">Hoàn tiền</button>` : ''}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="7" class="rong">Chưa có yêu cầu hủy đơn nào</td></tr>'}
@@ -1459,7 +1730,7 @@
       b.onclick = async () => {
         const chapNhan = b.dataset.cn === '1';
         const lyDoTuChoi = chapNhan ? null : prompt('Nhập lý do từ chối yêu cầu hủy:');
-        if (!chapNhan && !lyDoTuChoi) return;
+        if (!chapNhan && lyDoTuChoi === null) return;
         const url = chapNhan ? 'huy-don/xac-nhan' : 'huy-don/tu-choi';
         const r = await goiApi(url, { method: 'POST', body: JSON.stringify({ maYeuCau: Number(b.dataset.xlYc), lyDo: lyDoTuChoi }) });
         hienThongBaoToast(r.thongBao, r.thanhCong);
@@ -1471,24 +1742,24 @@
       b.onclick = () => {
         const yc = ds.find(x => x.maDonHang == b.dataset.hoanTien);
         const toiDa = yc ? (yc.soTienThanhToan || yc.tongTien) : 0;
-        moModal(`Xử lý hoàn tiền mô phỏng — Đơn #DH${b.dataset.hoanTien} (UC38)`, `
+        moModal(`Xử lý hoàn tiền — Đơn hàng #DH${b.dataset.hoanTien}`, `
           <form id="form-hoan-tien">
             <div class="nhom-nhap">
-              <label>Số tiền khách đã thanh toán: <strong>${dinhDangTien(toiDa)}</strong></label>
-              <input id="ht-sotien" type="number" min="1" value="${Math.round(toiDa)}" required />
+              <label for="numSoTienHoan">Số tiền khách đã thanh toán: <strong>${dinhDangTien(toiDa)}</strong></label>
+              <input id="numSoTienHoan" type="number" min="1" value="${Math.round(toiDa)}" required />
             </div>
             <div class="nhom-nhap">
-              <label>Ghi chú / Lý do hoàn tiền</label>
-              <input id="ht-lydo" value="Hoàn tiền đơn hàng đã hủy #DH${b.dataset.hoanTien}" required />
+              <label for="txtLyDoHoanTien">Ghi chú / Lý do hoàn tiền</label>
+              <input id="txtLyDoHoanTien" value="Hoàn tiền đơn hàng đã hủy #DH${b.dataset.hoanTien}" required />
             </div>
             <div class="nhom-nhap">
-              <label>Kết quả cổng hoàn tiền mô phỏng</label>
+              <label for="ht-kq">Kết quả giao dịch hoàn tiền</label>
               <select id="ht-kq">
                 <option value="1">Hoàn tiền thành công</option>
-                <option value="0">Mô phỏng lỗi cổng thanh toán (Hoàn tiền lỗi)</option>
+                <option value="0">Mô phỏng lỗi cổng thanh toán</option>
               </select>
             </div>
-            <button type="submit" class="nut nut-chinh nut-rong">Thực hiện hoàn tiền</button>
+            <button type="submit" id="btnHoanTien" class="nut nut-chinh nut-rong">Thực hiện hoàn tiền</button>
           </form>
         `);
         document.getElementById('form-hoan-tien').onsubmit = async (e) => {
@@ -1497,8 +1768,8 @@
             method: 'POST',
             body: JSON.stringify({
               maDonHang: Number(b.dataset.hoanTien),
-              soTienHoan: Number(document.getElementById('ht-sotien').value),
-              lyDo: document.getElementById('ht-lydo').value.trim(),
+              soTienHoan: Number(document.getElementById('numSoTienHoan').value),
+              lyDo: document.getElementById('txtLyDoHoanTien').value.trim(),
               hoanThanhCong: document.getElementById('ht-kq').value === '1',
             }),
           });
@@ -1512,29 +1783,29 @@
     });
   }
 
-  // ==================== 13. TRA CỨU KHÁCH HÀNG (UC47 - CHỈ XEM) ====================
+  // ==================== 13. TRA CỨU KHÁCH HÀNG ====================
   async function renderKhachHang(tuKhoa = '') {
     const kq = await goiApi('khach-hang' + (tuKhoa ? '?tuKhoa=' + encodeURIComponent(tuKhoa) : ''));
     const ds = kq.duLieu || [];
     document.getElementById('khung-man-hinh').innerHTML = `
       <div class="khung-bang">
         <div class="thanh-cong-cu">
-          <strong>Tra cứu Khách hàng & Lịch sử mua (UC47 — Chỉ xem)</strong>
+          <strong>Tra cứu thông tin & Lịch sử mua hàng của khách hàng</strong>
           <div style="display:flex; gap:8px;">
             <input id="tim-kh" placeholder="Tìm theo tên, SĐT, email..." value="${maHoaHtml(tuKhoa)}" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px;" />
-            <button type="button" class="nut nut-chinh" id="btn-tim-kh">Tìm</button>
+            <button type="button" class="nut nut-chinh" id="btn-tim-kh">Tìm kiếm</button>
           </div>
         </div>
-        <table class="bang-du-lieu">
+        <table class="bang-du-lieu" id="grdKhachHang">
           <thead><tr><th>Mã KH</th><th>Họ tên</th><th>SĐT</th><th>Email</th><th>Số đơn</th><th>Tổng chi tiêu</th><th>Thao tác</th></tr></thead>
           <tbody>
             ${ds.map(kh => `
               <tr>
                 <td>#KH${kh.maKhachHang}</td><td><strong>${maHoaHtml(kh.hoTen)}</strong></td><td>${maHoaHtml(kh.soDienThoai || '')}</td><td>${maHoaHtml(kh.email || '')}</td>
                 <td>${kh.tongSoDon}</td><td>${dinhDangTien(kh.tongChiTieu)}</td>
-                <td><button class="nut nut-phu nut-nho" data-ls-kh="${kh.maKhachHang}" data-ten="${maHoaHtml(kh.hoTen)}">Xem lịch sử mua</button></td>
+                <td><button type="button" class="nut nut-phu nut-nho" data-ls-kh="${kh.maKhachHang}" data-ten="${maHoaHtml(kh.hoTen)}">Xem lịch sử mua</button></td>
               </tr>
-            `).join('')}
+            `).join('') || '<tr><td colspan="7" class="rong">Không tìm thấy khách hàng phù hợp</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1558,8 +1829,10 @@
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.nut-nhanh').forEach(btn => {
       btn.onclick = () => {
-        document.getElementById('nhap-dinh-danh').value = btn.dataset.tk;
-        document.getElementById('nhap-mat-khau').value = '123456';
+        const oDinhDanh = document.getElementById('txtDinhDanh');
+        const oMatKhau = document.getElementById('pwdMatKhau');
+        oDinhDanh.value = btn.dataset.tk;
+        oMatKhau.focus();
       };
     });
 
@@ -1570,8 +1843,8 @@
       const kq = await goiApi('xac-thuc/dang-nhap', {
         method: 'POST',
         body: JSON.stringify({
-          dinhDanh: document.getElementById('nhap-dinh-danh').value.trim(),
-          matKhau: document.getElementById('nhap-mat-khau').value,
+          dinhDanh: document.getElementById('txtDinhDanh').value.trim(),
+          matKhau: document.getElementById('pwdMatKhau').value,
         }),
       });
       if (!kq.thanhCong) {
@@ -1607,8 +1880,7 @@
     document.getElementById('nut-mo-quen-mk').onclick = () => document.getElementById('modal-quen-mk').classList.remove('an');
     document.getElementById('dong-modal-quen-mk').onclick = () => document.getElementById('modal-quen-mk').classList.add('an');
 
-    // UC42: Kiểm tra an toàn kq.duLieu trước khi đọc maXacThucMoPhong (tránh crash luồng chống dò tài khoản)
-    document.getElementById('qmk-gui-ma').onclick = async () => {
+    document.getElementById('btnGuiMaXacThuc').onclick = async () => {
       const kq = await goiApi('xac-thuc/quen-mat-khau', {
         method: 'POST',
         body: JSON.stringify({ dinhDanh: document.getElementById('qmk-dinh-danh').value.trim() }),
@@ -1625,9 +1897,9 @@
       }
     };
 
-    document.getElementById('qmk-dat-lai').onclick = async () => {
-      const matKhauMoi = document.getElementById('qmk-mat-khau-moi').value;
-      const xacNhanEl = document.getElementById('qmk-xac-nhan-mk');
+    document.getElementById('btnDatLaiMatKhau').onclick = async () => {
+      const matKhauMoi = document.getElementById('pwdMatKhauMoi').value;
+      const xacNhanEl = document.getElementById('pwdXacNhan');
       const xacNhanMatKhau = xacNhanEl ? xacNhanEl.value : matKhauMoi;
       if (matKhauMoi !== xacNhanMatKhau) {
         alert('Mật khẩu xác nhận không khớp');
@@ -1637,7 +1909,7 @@
         method: 'POST',
         body: JSON.stringify({
           dinhDanh: document.getElementById('qmk-dinh-danh').value.trim(),
-          maXacThuc: document.getElementById('qmk-ma-xac-thuc').value.trim(),
+          maXacThuc: document.getElementById('txtMaXacThuc').value.trim(),
           matKhauMoi,
           xacNhanMatKhau,
         }),

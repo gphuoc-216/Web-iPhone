@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phone Store — Hệ thống Bán Điện Thoại Chính Hãng (BCE)</title>
+  <title>Phone Store — Hệ thống Bán Điện Thoại Chính Hãng</title>
   <script src="/config.js"></script>
   <link rel="stylesheet" href="/assets/style.css" />
   <link rel="stylesheet" href="/custom.css" />
@@ -19,9 +19,10 @@
         <span>Phone<strong>Store</strong></span>
       </a>
 
+      <!-- Mục 3.6.3 - Bảng 177, Bảng 178: txtTuKhoa, btnTimKiem -->
       <form id="form-tim-kiem" class="o-tim-kiem">
-        <input id="nhap-tu-khoa" type="search" placeholder="Tìm iPhone, Samsung, Xiaomi, chip Snapdragon..." />
-        <button type="submit">Tìm kiếm</button>
+        <input id="txtTuKhoa" type="search" placeholder="Tìm iPhone, Samsung, Xiaomi, chip Snapdragon..." />
+        <button type="submit" id="btnTimKiem">Tìm kiếm</button>
       </form>
 
       <div class="cum-hanh-dong">
@@ -48,19 +49,19 @@
     </div>
   </section>
 
-  <!-- BỘ LỌC ĐA ĐIỀU KIỆN (UC8) -->
+  <!-- BỘ LỌC ĐA ĐIỀU KIỆN (Mục 3.6.3 - Bảng 177, Bảng 178) -->
   <section class="khung-chua">
     <div class="thanh-bo-loc">
-      <select id="loc-hang">
+      <select id="cboHang" aria-label="Hãng sản xuất">
         <option value="">Tất cả hãng</option>
         <option value="Apple">Apple</option>
         <option value="Samsung">Samsung</option>
         <option value="Xiaomi">Xiaomi</option>
         <option value="OPPO">OPPO</option>
       </select>
-      <input id="loc-gia-tu" type="number" min="0" step="1000000" placeholder="Giá từ (VNĐ)" />
-      <input id="loc-gia-den" type="number" min="0" step="1000000" placeholder="Giá đến (VNĐ)" />
-      <select id="loc-ram">
+      <input id="numGiaTu" type="number" min="0" step="1000000" placeholder="Giá từ (VNĐ)" />
+      <input id="numGiaDen" type="number" min="0" step="1000000" placeholder="Giá đến (VNĐ)" />
+      <select id="cboRAM" aria-label="Dung lượng RAM">
         <option value="">Tất cả RAM</option>
         <option value="4">4 GB</option>
         <option value="6">6 GB</option>
@@ -68,7 +69,7 @@
         <option value="12">12 GB</option>
         <option value="16">16 GB</option>
       </select>
-      <select id="loc-rom">
+      <select id="cboROM" aria-label="Bộ nhớ ROM">
         <option value="">Tất cả ROM</option>
         <option value="64">64 GB</option>
         <option value="128">128 GB</option>
@@ -76,30 +77,30 @@
         <option value="512">512 GB</option>
         <option value="1024">1 TB</option>
       </select>
-      <select id="loc-pin">
+      <select id="cboPin" aria-label="Dung lượng pin">
         <option value="">Dung lượng pin</option>
         <option value="3000">Từ 3.000 mAh</option>
         <option value="4000">Từ 4.000 mAh</option>
         <option value="4500">Từ 4.500 mAh</option>
         <option value="5000">Từ 5.000 mAh</option>
       </select>
-      <select id="loc-sap-xep">
+      <select id="loc-sap-xep" aria-label="Sắp xếp">
         <option value="moiNhat">Mới nhất</option>
         <option value="giaTangDan">Giá tăng dần</option>
         <option value="giaGiamDan">Giá giảm dần</option>
       </select>
-      <button type="button" id="nut-ap-dung-loc" class="nut nut-chinh">Lọc</button>
+      <button type="button" id="btnLoc" class="nut nut-chinh">Lọc</button>
       <button type="button" id="nut-xoa-loc" class="nut nut-phu">Đặt lại</button>
     </div>
 
     <div id="thanh-thong-bao-web" class="toast-web an"></div>
 
-    <!-- DANH SÁCH SẢN PHẨM -->
+    <!-- DANH SÁCH SẢN PHẨM (grdSanPham) -->
     <div class="tieu-de-muc">
       <h2 id="tieu-de-danh-sach">Danh sách điện thoại đang kinh doanh</h2>
       <span id="tong-so-san-pham" class="chu-phu"></span>
     </div>
-    <div id="luoi-san-pham" class="luoi-san-pham"></div>
+    <div id="grdSanPham" class="luoi-san-pham"></div>
   </section>
 
   <!-- MODAL DÙNG CHUNG (CHI TIẾT SP / GIỎ HÀNG / ĐẶT HÀNG / TÀI KHOẢN / XÁC THỰC) -->
@@ -115,7 +116,7 @@
 
   <footer class="chan-trang">
     <div class="khung-chua">
-      <strong>Phone Store</strong> — Hệ thống bán điện thoại theo kiến trúc BCE (30 bảng RDM · Localhost) · <a
+      <strong>Phone Store</strong> — Hệ thống quản lý bán điện thoại trực tuyến · <a
         href="/admin">Cổng Quản trị Nội bộ</a>
     </div>
   </footer>

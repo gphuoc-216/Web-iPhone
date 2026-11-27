@@ -10,7 +10,13 @@ $congCsdl    = getenv('DB_PORT') ?: '3306';
 $tenCsdl     = getenv('DB_NAME') ?: 'quan_ly_ban_dien_thoai';
 $taiKhoanDb  = getenv('DB_USER') ?: 'root';
 $matKhauEnv  = getenv('DB_PASS');
-$matKhauDb   = ($matKhauEnv !== false) ? $matKhauEnv : ''; // Khi chạy Docker sẽ tự lấy DB_PASS; chạy local XAMPP/Laragon mặc định là '' (đổi nếu MySQL có password)
+if ($matKhauEnv !== false) {
+    $matKhauDb = $matKhauEnv;
+} elseif (is_file('D:/mysql/root.cnf') && preg_match('/^\s*password\s*=\s*(.+)$/mi', (string)@file_get_contents('D:/mysql/root.cnf'), $mCnf)) {
+    $matKhauDb = trim($mCnf[1], " \t\n\r\0\x0B\"'");
+} else {
+    $matKhauDb = '';
+}
 
 $ketNoiPdo   = null;
 $loiCsdl     = null;
@@ -122,6 +128,28 @@ function layDuLieuDauVao(): array
     $noiDungTho = file_get_contents('php://input');
     $giaiMa = json_decode($noiDungTho ?: '{}', true);
     return is_array($giaiMa) ? $giaiMa : [];
+}
+
+/**
+ * Boundary: lưu tệp ảnh tải lên (UC4, UC5) và trả về đường dẫn hinhAnh để truyền vào Controller.
+ * Trả về null nếu không có tệp hoặc tệp không phải ảnh hợp lệ.
+ */
+function luuAnhTaiLen(?array $tepAnh): ?string
+{
+    if (!$tepAnh || ($tepAnh['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    $duoiTep = strtolower(pathinfo($tepAnh['name'], PATHINFO_EXTENSION));
+    if (!in_array($duoiTep, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) || @getimagesize($tepAnh['tmp_name']) === false) {
+        return null;
+    }
+    $thuMucUpload = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
+    if (!is_dir($thuMucUpload)) {
+        @mkdir($thuMucUpload, 0775, true);
+    }
+    $tenGoc = trim((string)preg_replace('/[^a-zA-Z0-9_-]/', '_', pathinfo($tepAnh['name'], PATHINFO_FILENAME)), '_') ?: 'dienthoai';
+    $tenMoi = $tenGoc . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3)) . '.' . $duoiTep;
+    return move_uploaded_file($tepAnh['tmp_name'], $thuMucUpload . DIRECTORY_SEPARATOR . $tenMoi) ? 'uploads/' . $tenMoi : null;
 }
 
 /**

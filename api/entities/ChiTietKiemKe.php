@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: ChiTietKiemKe — Bảng ChiTietKiemKe
+// Entity BCE: ChiTietKiemKe — Bảng ChiTietKiemKe (Mục 3.4.3.6: Bảng 95, Bảng 96; RDM: Bảng 146 — 3NF: không lưu vật lý chenhLech)
 
 class ChiTietKiemKe
 {
@@ -30,17 +30,17 @@ class ChiTietKiemKe
         if (array_key_exists('soLuongThucTe', $duLieu)) {
             $this->soLuongThucTe = (int)($duLieu['soLuongThucTe'] ?? 0);
         }
-        if (array_key_exists('chenhLech', $duLieu)) {
-            $this->chenhLech = (int)($duLieu['chenhLech'] ?? 0);
-        }
+        $this->chenhLech = array_key_exists('chenhLech', $duLieu)
+            ? (int)$duLieu['chenhLech']
+            : ($this->soLuongThucTe - $this->soLuongHeThong);
     }
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
+        if ($tenThuocTinh === 'chenhLech') {
+            return $this->soLuongThucTe - $this->soLuongHeThong;
         }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -63,12 +63,12 @@ class ChiTietKiemKe
     public function chuyenThanhMang(): array
     {
         return [
-            'maChiTiet' => $this->maChiTiet,
-            'maBienBan' => $this->maBienBan,
-            'maDienThoai' => $this->maDienThoai,
+            'maChiTiet'      => $this->maChiTiet,
+            'maBienBan'      => $this->maBienBan,
+            'maDienThoai'    => $this->maDienThoai,
             'soLuongHeThong' => $this->soLuongHeThong,
-            'soLuongThucTe' => $this->soLuongThucTe,
-            'chenhLech' => $this->chenhLech,
+            'soLuongThucTe'  => $this->soLuongThucTe,
+            'chenhLech'      => $this->soLuongThucTe - $this->soLuongHeThong,
         ];
     }
 
@@ -77,6 +77,7 @@ class ChiTietKiemKe
         return $pdo ?? layKetNoiCsdl(true);
     }
 
+    // [UC18 - Hình 26] ChiTietKiemKe::kiemTraHopLe(danhSachSoLuong)
     public static function kiemTraHopLe(array $danhSachSoLuong): bool
     {
         if (empty($danhSachSoLuong)) return false;
@@ -88,9 +89,10 @@ class ChiTietKiemKe
         return true;
     }
 
-    public static function tinhChenhLech(int $maDienThoai, int $soLuongThucTe, int $maKho = 1, ?PDO $pdo = null): array
+    // [UC18 - Hình 26] ChiTietKiemKe::tinhChenhLech(maDienThoai, soLuongThucTe)
+    public static function tinhChenhLech(int $maDienThoai, int $soLuongThucTe, ?PDO $pdo = null): array
     {
-        $ton = TonKho::timTheoDienThoai($maDienThoai, $maKho, false, $pdo);
+        $ton = TonKho::timTheoDienThoai($maDienThoai, false, $pdo);
         $heThong = $ton ? (int)$ton['tonThucTe'] : 0;
         return [
             'soLuongHeThong' => $heThong,
@@ -99,23 +101,28 @@ class ChiTietKiemKe
         ];
     }
 
-    public static function luu(int $maBienBan, int $maDienThoai, int $soLuongHeThong, int $soLuongThucTe, int $chenhLech, ?PDO $pdo = null): int
+    public static function luu(int $maBienBan, int $maDienThoai, int $soLuongHeThong, int $soLuongThucTe, ?PDO $pdo = null): int
     {
         $db = self::pdo($pdo);
-        $db->prepare("INSERT INTO ChiTietKiemKe (maBienBan, maDienThoai, soLuongHeThong, soLuongThucTe, chenhLech) VALUES (?, ?, ?, ?, ?)")
-           ->execute([$maBienBan, $maDienThoai, $soLuongHeThong, $soLuongThucTe, $chenhLech]);
+        $db->prepare("INSERT INTO ChiTietKiemKe (maBienBan, maDienThoai, soLuongHeThong, soLuongThucTe) VALUES (?, ?, ?, ?)")
+           ->execute([$maBienBan, $maDienThoai, $soLuongHeThong, $soLuongThucTe]);
         return (int)$db->lastInsertId();
     }
 
+    // [UC19 - Hình 27] ChiTietKiemKe::timTheoBienBan(maBienBan)
     public static function timTheoBienBan(?int $maBienBan = null, ?PDO $pdo = null): array
     {
         $db = self::pdo($pdo);
+        $sql = "SELECT ct.maChiTiet, ct.maBienBan, ct.maDienThoai, ct.soLuongHeThong, ct.soLuongThucTe,
+                       (ct.soLuongThucTe - ct.soLuongHeThong) AS chenhLech,
+                       d.ten AS tenDienThoai
+                FROM ChiTietKiemKe ct
+                LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai";
         if ($maBienBan !== null) {
-            $stmt = $db->prepare("SELECT ct.*, d.ten AS tenDienThoai FROM ChiTietKiemKe ct LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai WHERE ct.maBienBan = ?");
+            $stmt = $db->prepare($sql . " WHERE ct.maBienBan = ?");
             $stmt->execute([$maBienBan]);
             return $stmt->fetchAll();
         }
-        return $db->query("SELECT ct.*, d.ten AS tenDienThoai FROM ChiTietKiemKe ct LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai")->fetchAll();
+        return $db->query($sql)->fetchAll();
     }
-
 }

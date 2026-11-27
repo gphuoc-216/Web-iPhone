@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: PhienDangNhap — Bảng PhienDangNhap
+// Entity BCE: PhienDangNhap — Bảng PhienDangNhap (Mục 3.4.3.20: Bảng 115, Bảng 116; RDM: Bảng 160)
 
 class PhienDangNhap
 {
@@ -33,10 +33,7 @@ class PhienDangNhap
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
-        }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -59,11 +56,11 @@ class PhienDangNhap
     public function chuyenThanhMang(): array
     {
         return [
-            'maPhien' => $this->maPhien,
-            'maTaiKhoan' => $this->maTaiKhoan,
-            'thoiDiemTao' => $this->thoiDiemTao,
+            'maPhien'        => $this->maPhien,
+            'maTaiKhoan'     => $this->maTaiKhoan,
+            'thoiDiemTao'    => $this->thoiDiemTao,
             'thoiDiemHetHan' => $this->thoiDiemHetHan,
-            'trangThai' => $this->trangThai,
+            'trangThai'      => $this->trangThai,
         ];
     }
 
@@ -80,6 +77,7 @@ class PhienDangNhap
         return strtotime($this->thoiDiemHetHan) > time();
     }
 
+    // [UC40 - Hình 48] PhienDangNhap::taoPhien(maTaiKhoan) — Bảng 116 STT 5
     public static function taoPhien(int $maTaiKhoan, ?PDO $pdo = null): array
     {
         $maPhien = bin2hex(random_bytes(32));
@@ -91,18 +89,27 @@ class PhienDangNhap
         return ['maPhien' => $maPhien, 'thoiDiemHetHan' => $thoiDiemHetHan];
     }
 
+    // [UC41 - Hình 49] PhienDangNhap::huyPhien(maPhien) — Bảng 116 STT 1
     public static function huyPhien(string $maPhien, ?PDO $pdo = null): bool
     {
         if ($maPhien === '') return false;
         return self::pdo($pdo)->prepare("UPDATE PhienDangNhap SET trangThai = 'Đã hủy' WHERE maPhien = ?")->execute([$maPhien]);
     }
 
+    // [UC42, UC49, UC52 - Hình 50, Hình 57, Hình 60] PhienDangNhap::huyPhienTheoTaiKhoan(maTaiKhoan) — Bảng 116 STT 2
     public static function huyPhienTheoTaiKhoan(int $maTaiKhoan, ?PDO $pdo = null): bool
     {
         return self::pdo($pdo)->prepare("UPDATE PhienDangNhap SET trangThai = 'Đã hủy' WHERE maTaiKhoan = ?")->execute([$maTaiKhoan]);
     }
 
+    // [UC41 - Hình 49] PhienDangNhap::kiemTraConHieuLuc(maPhien) — Bảng 116 STT 3
     public static function kiemTraConHieuLuc(string $maPhien, ?PDO $pdo = null): bool
+    {
+        return self::layThongTinPhien($maPhien, $pdo) !== null;
+    }
+
+    // [UC28 - Hình 36] PhienDangNhap::kiemTraDangNhap(maPhien) — Bảng 116 STT 4
+    public static function kiemTraDangNhap(string $maPhien, ?PDO $pdo = null): bool
     {
         return self::layThongTinPhien($maPhien, $pdo) !== null;
     }
@@ -125,5 +132,4 @@ class PhienDangNhap
         }
         return $row;
     }
-
 }

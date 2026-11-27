@@ -1,5 +1,5 @@
 <?php
-// Entity BCE: KhachHang — Bảng KhachHang
+// Entity BCE: KhachHang — Bảng KhachHang (Mục 3.4.3.16: Bảng 107, Bảng 108; RDM: Bảng 155)
 
 class KhachHang
 {
@@ -9,7 +9,7 @@ class KhachHang
     private ?int $maKhachHang = null;
     private ?int $maTaiKhoan = null;
     private string $hoTen = '';
-    private ?string $soDienThoai = null;
+    private string $soDienThoai = '';
     private ?string $email = null;
 
     public function __construct(array $duLieu = [])
@@ -24,7 +24,7 @@ class KhachHang
             $this->hoTen = (string)($duLieu['hoTen'] ?? '');
         }
         if (array_key_exists('soDienThoai', $duLieu)) {
-            $this->soDienThoai = isset($duLieu['soDienThoai']) && $duLieu['soDienThoai'] !== '' ? (string)$duLieu['soDienThoai'] : null;
+            $this->soDienThoai = (string)($duLieu['soDienThoai'] ?? '');
         }
         if (array_key_exists('email', $duLieu)) {
             $this->email = isset($duLieu['email']) && $duLieu['email'] !== '' ? (string)$duLieu['email'] : null;
@@ -33,10 +33,7 @@ class KhachHang
 
     public function __get(string $tenThuocTinh)
     {
-        if (property_exists($this, $tenThuocTinh)) {
-            return $this->$tenThuocTinh;
-        }
-        return null;
+        return property_exists($this, $tenThuocTinh) ? $this->$tenThuocTinh : null;
     }
 
     public function __set(string $tenThuocTinh, $giaTri): void
@@ -60,10 +57,10 @@ class KhachHang
     {
         return [
             'maKhachHang' => $this->maKhachHang,
-            'maTaiKhoan' => $this->maTaiKhoan,
-            'hoTen' => $this->hoTen,
+            'maTaiKhoan'  => $this->maTaiKhoan,
+            'hoTen'       => $this->hoTen,
             'soDienThoai' => $this->soDienThoai,
-            'email' => $this->email,
+            'email'       => $this->email,
         ];
     }
 
@@ -72,6 +69,7 @@ class KhachHang
         return $pdo ?? layKetNoiCsdl(true);
     }
 
+    // [UC44 - Hình 52] KhachHang::kiemTraHopLe(hoTen, soDienThoai, email) — Bảng 108 STT 2
     public static function kiemTraHopLe(string $hoTen, ?string $soDienThoai = null, ?string $email = null): bool
     {
         if (trim($hoTen) === '') return false;
@@ -79,20 +77,25 @@ class KhachHang
         return true;
     }
 
-    public static function luu(int $maTaiKhoan, string $hoTen, ?string $soDienThoai = null, ?string $email = null, ?PDO $pdo = null): int
+    // [UC39 - Hình 47] KhachHang::luu(maTaiKhoan, hoTen) — Bảng 108 STT 3
+    public static function luu(int $maTaiKhoan, string $hoTen, ?string $soDienThoai = '', ?string $email = null, ?PDO $pdo = null): int
     {
         $db = self::pdo($pdo);
+        $sdtSach = $soDienThoai !== null ? trim($soDienThoai) : '';
+        $emailSach = ($email !== null && trim($email) !== '') ? trim($email) : null;
         $db->prepare("INSERT INTO KhachHang (maTaiKhoan, hoTen, soDienThoai, email) VALUES (?, ?, ?, ?)")
-           ->execute([$maTaiKhoan, trim($hoTen), $soDienThoai, $email]);
+           ->execute([$maTaiKhoan, trim($hoTen), $sdtSach, $emailSach]);
         return (int)$db->lastInsertId();
     }
 
+    // [UC44 - Hình 52] KhachHang::capNhat(maKhachHang, hoTen, soDienThoai, email) — Bảng 108 STT 1
     public static function capNhat(int $maKhachHang, string $hoTen, ?string $soDienThoai, ?string $email, ?PDO $pdo = null): bool
     {
         return self::pdo($pdo)->prepare("UPDATE KhachHang SET hoTen = ?, soDienThoai = ?, email = ? WHERE maKhachHang = ?")
-            ->execute([trim($hoTen), $soDienThoai, $email, $maKhachHang]);
+            ->execute([trim($hoTen), trim((string)$soDienThoai), ($email !== null && trim($email) !== '') ? trim($email) : null, $maKhachHang]);
     }
 
+    // [UC43, UC44 - Hình 51, Hình 52] KhachHang::timTheoMa(maKhachHang) — Bảng 108 STT 4
     public static function timTheoMa(int $maKhachHang, ?PDO $pdo = null): ?array
     {
         $stmt = self::pdo($pdo)->prepare(
@@ -114,6 +117,7 @@ class KhachHang
         return $r ?: null;
     }
 
+    // [UC47 - Hình 55] KhachHang::timTheoTuKhoa(tuKhoa) — Bảng 108 STT 5
     public static function timTheoTuKhoa(?string $tuKhoa = null, ?PDO $pdo = null): array
     {
         $sql = "SELECT kh.*, tk.dinhDanh, tk.trangThai,
@@ -134,5 +138,4 @@ class KhachHang
         $stmt->execute($ts);
         return $stmt->fetchAll();
     }
-
 }
