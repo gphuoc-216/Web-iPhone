@@ -1,5 +1,5 @@
 <?php
-// Controller BCE: PhieuNhapCtrl (UC12 - UC14)
+// Controller BCE: PhieuNhapCtrl (UC12 - UC14) — Phụ lục B.1 Lan03
 
 class PhieuNhapCtrl
 {
@@ -10,190 +10,136 @@ class PhieuNhapCtrl
         $this->pdo = $pdo;
     }
 
-    private function guiThongBaoTheoVaiTro(string $vaiTro, string $noiDung): void
+    private function dinhKemChiTiet(array $dsPhieu): array
     {
-        $stmt = $this->pdo->prepare("SELECT maTaiKhoan FROM TaiKhoan WHERE vaiTro = ? AND trangThai = 'Hoạt động'");
-        $stmt->execute([$vaiTro]);
-        $themTb = $this->pdo->prepare("INSERT INTO ThongBao (maNguoiNhan, noiDung, thoiDiemTao, daDoc) VALUES (?, ?, CURRENT_TIMESTAMP, FALSE)");
-        foreach ($stmt->fetchAll() as $tk) {
-            $themTb->execute([$tk['maTaiKhoan'], $noiDung]);
-        }
-    }
-
-    private function guiThongBaoTheoNhanVien(int $maNhanVien, string $noiDung): void
-    {
-        $stmt = $this->pdo->prepare("SELECT maTaiKhoan FROM NhanVien WHERE maNhanVien = ? LIMIT 1");
-        $stmt->execute([$maNhanVien]);
-        $maTaiKhoan = $stmt->fetchColumn();
-        if ($maTaiKhoan) {
-            $this->pdo->prepare("INSERT INTO ThongBao (maNguoiNhan, noiDung, thoiDiemTao, daDoc) VALUES (?, ?, CURRENT_TIMESTAMP, FALSE)")
-                ->execute([$maTaiKhoan, $noiDung]);
-        }
-    }
-
-    public function layDanhSachPhieuNhap(?string $trangThai = null): array
-    {
-        $sql = "SELECT pn.*, nv.hoTen AS tenNhanVien
-                FROM PhieuNhap pn
-                LEFT JOIN NhanVien nv ON nv.maNhanVien = pn.maNhanVien";
-        $thamSo = [];
-        if ($trangThai !== null && $trangThai !== '') {
-            $sql .= " WHERE pn.trangThai = ?";
-            $thamSo[] = $trangThai;
-        }
-        $sql .= " ORDER BY pn.maPhieuNhap DESC";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($thamSo);
-        $dsPhieu = $stmt->fetchAll();
-
-        $ctStmt = $this->pdo->query(
-            "SELECT ct.*, d.ten AS tenDienThoai
-             FROM ChiTietPhieuNhap ct
-             LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai"
-        );
-        $chiTietTheoPhieu = [];
-        foreach ($ctStmt->fetchAll() as $ct) {
+        $tatCaCt = ChiTietPhieuNhap::timTheoPhieuNhap(null, $this->pdo);
+        $ctTheoPhieu = [];
+        foreach ($tatCaCt as $ct) {
             $ma = (int)$ct['maPhieuNhap'];
             $muc = ChiTietPhieuNhap::tuMang($ct)->chuyenThanhMang();
             $muc['tenDienThoai'] = $ct['tenDienThoai'] ?? '';
-            $chiTietTheoPhieu[$ma][] = $muc;
+            $ctTheoPhieu[$ma][] = $muc;
         }
-
         $ketQua = [];
         foreach ($dsPhieu as $p) {
             $phieu = PhieuNhap::tuMang($p)->chuyenThanhMang();
             $phieu['tenNhanVien'] = $p['tenNhanVien'] ?? '';
-            $phieu['chiTiet'] = $chiTietTheoPhieu[$phieu['maPhieuNhap']] ?? [];
+            $phieu['chiTiet'] = $ctTheoPhieu[$phieu['maPhieuNhap']] ?? [];
             $ketQua[] = $phieu;
         }
-
-        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách phiếu nhập thành công', 'duLieu' => $ketQua];
+        return $ketQua;
     }
 
-    public function taoPhieuNhap(array $duLieu, int $maNhanVien): array
+    public function layDanhSachPhieuNhap(): array
+    {
+        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách phiếu nhập thành công', 'duLieu' => $this->dinhKemChiTiet(PhieuNhap::timTatCa($this->pdo))];
+    }
+
+    public function layDanhSachPhieuChoDuyet(): array
+    {
+        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách phiếu nhập chờ duyệt thành công', 'duLieu' => $this->dinhKemChiTiet(PhieuNhap::timTheoTrangThai('Chờ duyệt', $this->pdo))];
+    }
+
+    public function locPhieuNhap(?string $trangThai = null, ?string $tuNgay = null, ?string $denNgay = null): array
+    {
+        $ds = PhieuNhap::timTheoDieuKien($trangThai, $tuNgay, $denNgay, $this->pdo);
+        return ['thanhCong' => true, 'thongBao' => 'Lọc danh sách phiếu nhập thành công', 'duLieu' => $this->dinhKemChiTiet($ds)];
+    }
+
+    public function layChiTietPhieuNhap(int $maPhieuNhap): array
+    {
+        $p = PhieuNhap::timTheoMa($maPhieuNhap, false, $this->pdo);
+        if (!$p) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy phiếu nhập', 'duLieu' => null, 'maHttp' => 404];
+        }
+        $phieu = PhieuNhap::tuMang($p)->chuyenThanhMang();
+        $phieu['tenNhanVien'] = $p['tenNhanVien'] ?? '';
+        $phieu['chiTiet'] = ChiTietPhieuNhap::timTheoPhieuNhap($maPhieuNhap, $this->pdo);
+        return ['thanhCong' => true, 'thongBao' => 'Lấy chi tiết phiếu nhập thành công', 'duLieu' => $phieu];
+    }
+
+    // UC12: luuPhieuNhap(nguonNhap, ngayNhap, danhSachHang)
+    public function luuPhieuNhap(array $duLieu, int $maNhanVien): array
     {
         $nguonNhap = trim((string)($duLieu['nguonNhap'] ?? ''));
         $ngayNhap = trim((string)($duLieu['ngayNhap'] ?? date('Y-m-d')));
-        $danhSachChiTiet = $duLieu['chiTiet'] ?? [];
+        $danhSachHang = $duLieu['chiTiet'] ?? $duLieu['danhSachHang'] ?? [];
 
-        if ($nguonNhap === '' || !is_array($danhSachChiTiet) || empty($danhSachChiTiet)) {
-            return ['thanhCong' => false, 'thongBao' => 'Vui lòng nhập nguồn nhập và ít nhất 1 dòng chi tiết phiếu nhập', 'duLieu' => null, 'maHttp' => 400];
+        if ($nguonNhap === '' || !is_array($danhSachHang) || empty($danhSachHang)) {
+            return ['thanhCong' => false, 'thongBao' => 'Vui lòng nhập nguồn nhập và ít nhất 1 dòng hàng chi tiết', 'duLieu' => null, 'maHttp' => 400];
+        }
+
+        foreach ($danhSachHang as $dong) {
+            $maDt = (int)($dong['maDienThoai'] ?? 0);
+            $sl = (int)($dong['soLuong'] ?? 0);
+            $gia = (float)($dong['donGiaNhap'] ?? 0);
+            if (!DienThoai::kiemTraTonTai($maDt, $this->pdo) || !ChiTietPhieuNhap::kiemTraHopLe($sl, $gia)) {
+                return ['thanhCong' => false, 'thongBao' => 'Dữ liệu sản phẩm, số lượng hoặc đơn giá nhập không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+            }
         }
 
         try {
-            $this->pdo->beginTransaction();
-
-            $this->pdo->prepare(
-                "INSERT INTO PhieuNhap (nguonNhap, ngayNhap, trangThai, maNhanVien) VALUES (?, ?, 'Nháp', ?)"
-            )->execute([$nguonNhap, $ngayNhap, $maNhanVien]);
-            $maPhieuNhap = (int)$this->pdo->lastInsertId();
-
-            $themCt = $this->pdo->prepare(
-                "INSERT INTO ChiTietPhieuNhap (maPhieuNhap, maDienThoai, soLuong, donGiaNhap) VALUES (?, ?, ?, ?)"
-            );
-            foreach ($danhSachChiTiet as $dong) {
-                $maDienThoai = (int)($dong['maDienThoai'] ?? 0);
-                $soLuong = (int)($dong['soLuong'] ?? 0);
-                $donGiaNhap = (float)($dong['donGiaNhap'] ?? 0);
-                if ($maDienThoai <= 0 || $soLuong <= 0 || $donGiaNhap <= 0) {
-                    throw new RuntimeException('Dữ liệu chi tiết phiếu nhập không hợp lệ (số lượng và đơn giá phải > 0)');
-                }
-                $themCt->execute([$maPhieuNhap, $maDienThoai, $soLuong, $donGiaNhap]);
+            batDauGiaoDich($this->pdo);
+            $maPhieuNhap = PhieuNhap::luu($maNhanVien, $nguonNhap, $ngayNhap, 'Nháp', $this->pdo);
+            foreach ($danhSachHang as $dong) {
+                ChiTietPhieuNhap::luu($maPhieuNhap, (int)$dong['maDienThoai'], (int)$dong['soLuong'], (float)$dong['donGiaNhap'], $this->pdo);
             }
-
-            $this->pdo->commit();
-            return ['thanhCong' => true, 'thongBao' => 'Tạo phiếu nhập ở trạng thái Nháp thành công', 'duLieu' => ['maPhieuNhap' => $maPhieuNhap, 'trangThai' => 'Nháp'], 'maHttp' => 201];
+            xacNhanGiaoDich($this->pdo);
+            return ['thanhCong' => true, 'thongBao' => 'Lưu phiếu nhập kho (Nháp) thành công', 'duLieu' => ['maPhieuNhap' => $maPhieuNhap, 'trangThai' => 'Nháp'], 'maHttp' => 201];
         } catch (Throwable $ngoaiLe) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['thanhCong' => false, 'thongBao' => 'Không thể tạo phiếu nhập: ' . $ngoaiLe->getMessage(), 'duLieu' => null, 'maHttp' => 400];
+            hoanTacGiaoDich($this->pdo);
+            error_log('luuPhieuNhap: ' . $ngoaiLe->getMessage());
+            return ['thanhCong' => false, 'thongBao' => 'Không thể tạo phiếu nhập kho', 'duLieu' => null, 'maHttp' => 500];
         }
     }
 
     public function guiDuyetPhieuNhap(int $maPhieuNhap): array
     {
-        $capNhat = $this->pdo->prepare("UPDATE PhieuNhap SET trangThai = 'Chờ duyệt' WHERE maPhieuNhap = ? AND trangThai = 'Nháp'");
-        $capNhat->execute([$maPhieuNhap]);
-        if ($capNhat->rowCount() === 0) {
+        if (!PhieuNhap::capNhatTrangThai($maPhieuNhap, 'Chờ duyệt', 'Nháp', $this->pdo)) {
             return ['thanhCong' => false, 'thongBao' => 'Phiếu nhập không tồn tại hoặc không ở trạng thái Nháp', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $this->guiThongBaoTheoVaiTro('Ban Quản lý', "Có phiếu nhập kho #{$maPhieuNhap} mới đang chờ duyệt.");
+        ThongBao::taoThongBaoTheoVaiTro('Ban Quản lý', "Có phiếu nhập kho #{$maPhieuNhap} mới đang chờ duyệt.", $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Đã gửi duyệt phiếu nhập và thông báo cho Ban Quản lý', 'duLieu' => ['maPhieuNhap' => $maPhieuNhap, 'trangThai' => 'Chờ duyệt']];
     }
 
+    // UC13: duyetPhieuNhap(maPhieuNhap)
     public function duyetPhieuNhap(int $maPhieuNhap): array
     {
         try {
-            $this->pdo->beginTransaction();
+            batDauGiaoDich($this->pdo);
 
-            $phieuStmt = $this->pdo->prepare("SELECT * FROM PhieuNhap WHERE maPhieuNhap = ? FOR UPDATE");
-            $phieuStmt->execute([$maPhieuNhap]);
-            $phieu = $phieuStmt->fetch();
-
+            $phieu = PhieuNhap::timTheoMa($maPhieuNhap, true, $this->pdo);
             if (!$phieu || $phieu['trangThai'] !== 'Chờ duyệt') {
-                $this->pdo->rollBack();
+                hoanTacGiaoDich($this->pdo);
                 return ['thanhCong' => false, 'thongBao' => 'Chỉ có thể duyệt phiếu nhập đang ở trạng thái Chờ duyệt', 'duLieu' => null, 'maHttp' => 400];
             }
 
-            $tyLeMacDinh = (float)($this->pdo->query("SELECT tyLe FROM CauHinhLoiNhuan ORDER BY maCauHinh DESC LIMIT 1")->fetchColumn() ?: 25.0);
-
-            $ctStmt = $this->pdo->prepare("SELECT * FROM ChiTietPhieuNhap WHERE maPhieuNhap = ?");
-            $ctStmt->execute([$maPhieuNhap]);
-            $chiTiets = $ctStmt->fetchAll();
-
+            $chiTiets = ChiTietPhieuNhap::timTheoPhieuNhap($maPhieuNhap, $this->pdo);
             foreach ($chiTiets as $ct) {
                 $maDt = (int)$ct['maDienThoai'];
                 $soLuongNhap = (int)$ct['soLuong'];
                 $donGiaNhap = (float)$ct['donGiaNhap'];
 
-                $tonStmt = $this->pdo->prepare("SELECT * FROM TonKho WHERE maDienThoai = ? AND maKho = 1 FOR UPDATE");
-                $tonStmt->execute([$maDt]);
-                $ton = $tonStmt->fetch();
+                $dtRow = DienThoai::timTheoMa($maDt, $this->pdo);
+                $tyLe = CauHinhLoiNhuan::layTyLeHienHanh($dtRow['hang'] ?? null, $this->pdo);
 
-                $dtStmt = $this->pdo->prepare("SELECT giaVonBinhQuan, hang FROM DienThoai WHERE maDienThoai = ? FOR UPDATE");
-                $dtStmt->execute([$maDt]);
-                $dtRow = $dtStmt->fetch();
-                $giaVonCu = (float)($dtRow['giaVonBinhQuan'] ?? 0);
-
-                // Tìm tỷ lệ lợi nhuận theo hãng trước, nếu không có dùng mặc định toàn bộ
-                $tyLeStmt = $this->pdo->prepare("SELECT tyLe FROM CauHinhLoiNhuan WHERE phamVi = ? LIMIT 1");
-                $tyLeStmt->execute([$dtRow['hang'] ?? '']);
-                $tyLeApDung = (float)($tyLeStmt->fetchColumn() ?: $tyLeMacDinh);
-
-                $tonCu = $ton ? (int)$ton['tonThucTe'] : 0;
-                $tongSoLuongMoi = $tonCu + $soLuongNhap;
-                $giaVonMoi = $tongSoLuongMoi > 0
-                    ? round((($tonCu * $giaVonCu) + ($soLuongNhap * $donGiaNhap)) / $tongSoLuongMoi, 2)
-                    : $donGiaNhap;
-                $giaBanMoi = round($giaVonMoi * (1 + $tyLeApDung / 100), 2);
-
-                if ($ton) {
-                    $tonThucTeMoi = $tonCu + $soLuongNhap;
-                    $tonKhaDungMoi = $tonThucTeMoi - (int)$ton['giuCho'];
-                    $this->pdo->prepare("UPDATE TonKho SET tonThucTe = ?, tonKhaDung = ? WHERE maTonKho = ?")
-                        ->execute([$tonThucTeMoi, $tonKhaDungMoi, $ton['maTonKho']]);
-                } else {
-                    $this->pdo->prepare("INSERT INTO TonKho (maDienThoai, maKho, tonThucTe, giuCho, tonKhaDung) VALUES (?, 1, ?, 0, ?)")
-                        ->execute([$maDt, $soLuongNhap, $soLuongNhap]);
-                }
-
-                $this->pdo->prepare("UPDATE DienThoai SET giaVonBinhQuan = ?, giaBan = ? WHERE maDienThoai = ?")
-                    ->execute([$giaVonMoi, $giaBanMoi, $maDt]);
+                $tonCu = TonKho::tangTonThucTe($maDt, $soLuongNhap, 1, $this->pdo);
+                DienThoai::capNhatGiaVonBinhQuan($maDt, $tonCu, $soLuongNhap, $donGiaNhap, $this->pdo);
+                DienThoai::tinhLaiGiaBan($maDt, $tyLe, $this->pdo);
             }
 
-            $this->pdo->prepare("UPDATE PhieuNhap SET trangThai = 'Đã duyệt' WHERE maPhieuNhap = ?")->execute([$maPhieuNhap]);
-            $this->guiThongBaoTheoNhanVien((int)$phieu['maNhanVien'], "Phiếu nhập kho #{$maPhieuNhap} đã được Ban Quản lý phê duyệt.");
+            PhieuNhap::capNhatTrangThai($maPhieuNhap, 'Đã duyệt', null, $this->pdo);
+            $maTkNv = NhanVien::layMaTaiKhoan((int)$phieu['maNhanVien'], $this->pdo);
+            if ($maTkNv) {
+                ThongBao::taoThongBao($maTkNv, "Phiếu nhập kho #{$maPhieuNhap} đã được Ban Quản lý phê duyệt.", $this->pdo);
+            }
 
-            $this->pdo->commit();
+            xacNhanGiaoDich($this->pdo);
             return ['thanhCong' => true, 'thongBao' => 'Duyệt phiếu nhập, cộng tồn kho và tính lại giá vốn bình quân thành công', 'duLieu' => ['maPhieuNhap' => $maPhieuNhap, 'trangThai' => 'Đã duyệt']];
         } catch (Throwable $ngoaiLe) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['thanhCong' => false, 'thongBao' => 'Lỗi duyệt phiếu nhập: ' . $ngoaiLe->getMessage(), 'duLieu' => null, 'maHttp' => 500];
+            hoanTacGiaoDich($this->pdo);
+            error_log('duyetPhieuNhap: ' . $ngoaiLe->getMessage());
+            return ['thanhCong' => false, 'thongBao' => 'Không thể duyệt phiếu nhập kho', 'duLieu' => null, 'maHttp' => 500];
         }
     }
 
@@ -203,17 +149,17 @@ class PhieuNhapCtrl
         if ($lyDo === '') {
             return ['thanhCong' => false, 'thongBao' => 'Vui lòng nhập lý do từ chối phiếu nhập', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $phieuStmt = $this->pdo->prepare("SELECT maNhanVien, trangThai FROM PhieuNhap WHERE maPhieuNhap = ? LIMIT 1");
-        $phieuStmt->execute([$maPhieuNhap]);
-        $phieu = $phieuStmt->fetch();
-
-        if (!$phieu || $phieu['trangThai'] !== 'Chờ duyệt') {
+        if (!PhieuNhap::kiemTraChoDuyet($maPhieuNhap, $this->pdo)) {
             return ['thanhCong' => false, 'thongBao' => 'Phiếu nhập không tồn tại hoặc không ở trạng thái Chờ duyệt', 'duLieu' => null, 'maHttp' => 400];
         }
 
-        $this->pdo->prepare("UPDATE PhieuNhap SET trangThai = 'Nháp' WHERE maPhieuNhap = ?")->execute([$maPhieuNhap]);
-        $this->guiThongBaoTheoNhanVien((int)$phieu['maNhanVien'], "Phiếu nhập #{$maPhieuNhap} bị từ chối và chuyển về Nháp. Lý do: {$lyDo}");
+        $phieu = PhieuNhap::timTheoMa($maPhieuNhap, false, $this->pdo);
+        PhieuNhap::capNhatTrangThai($maPhieuNhap, 'Nháp', null, $this->pdo);
+
+        $maTkNv = NhanVien::layMaTaiKhoan((int)$phieu['maNhanVien'], $this->pdo);
+        if ($maTkNv) {
+            ThongBao::taoThongBao($maTkNv, "Phiếu nhập #{$maPhieuNhap} bị từ chối và chuyển về Nháp. Lý do: {$lyDo}", $this->pdo);
+        }
 
         return [
             'thanhCong' => true,

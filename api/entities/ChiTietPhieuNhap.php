@@ -1,16 +1,16 @@
 <?php
-// Entity BCE: ChiTietPhieuNhap (Bảng ChiTietPhieuNhap)
+// Entity BCE: ChiTietPhieuNhap — Bảng ChiTietPhieuNhap
 
 class ChiTietPhieuNhap
 {
     public const TEN_BANG = 'ChiTietPhieuNhap';
     public const KHOA_CHINH = 'maChiTiet';
 
-    public ?int $maChiTiet = null;
-    public ?int $maPhieuNhap = null;
-    public ?int $maDienThoai = null;
-    public int $soLuong = 0;
-    public float $donGiaNhap = 0.0;
+    private ?int $maChiTiet = null;
+    private ?int $maPhieuNhap = null;
+    private ?int $maDienThoai = null;
+    private int $soLuong = 0;
+    private float $donGiaNhap = 0.0;
 
     public function __construct(array $duLieu = [])
     {
@@ -31,6 +31,26 @@ class ChiTietPhieuNhap
         }
     }
 
+    public function __get(string $tenThuocTinh)
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            return $this->$tenThuocTinh;
+        }
+        return null;
+    }
+
+    public function __set(string $tenThuocTinh, $giaTri): void
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            $this->$tenThuocTinh = $giaTri;
+        }
+    }
+
+    public function __isset(string $tenThuocTinh): bool
+    {
+        return property_exists($this, $tenThuocTinh) && $this->$tenThuocTinh !== null;
+    }
+
     public static function tuMang(array $duLieu): self
     {
         return new self($duLieu);
@@ -46,4 +66,34 @@ class ChiTietPhieuNhap
             'donGiaNhap' => $this->donGiaNhap,
         ];
     }
+
+    protected static function pdo(?PDO $pdo = null): PDO
+    {
+        return $pdo ?? layKetNoiCsdl(true);
+    }
+
+    public static function kiemTraHopLe(int $soLuong, float $donGiaNhap): bool
+    {
+        return $soLuong > 0 && $donGiaNhap > 0;
+    }
+
+    public static function luu(int $maPhieuNhap, int $maDienThoai, int $soLuong, float $donGiaNhap, ?PDO $pdo = null): int
+    {
+        $db = self::pdo($pdo);
+        $db->prepare("INSERT INTO ChiTietPhieuNhap (maPhieuNhap, maDienThoai, soLuong, donGiaNhap) VALUES (?, ?, ?, ?)")
+           ->execute([$maPhieuNhap, $maDienThoai, $soLuong, $donGiaNhap]);
+        return (int)$db->lastInsertId();
+    }
+
+    public static function timTheoPhieuNhap(?int $maPhieuNhap = null, ?PDO $pdo = null): array
+    {
+        $db = self::pdo($pdo);
+        if ($maPhieuNhap !== null) {
+            $stmt = $db->prepare("SELECT ct.*, d.ten AS tenDienThoai FROM ChiTietPhieuNhap ct LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai WHERE ct.maPhieuNhap = ?");
+            $stmt->execute([$maPhieuNhap]);
+            return $stmt->fetchAll();
+        }
+        return $db->query("SELECT ct.*, d.ten AS tenDienThoai FROM ChiTietPhieuNhap ct LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai")->fetchAll();
+    }
+
 }

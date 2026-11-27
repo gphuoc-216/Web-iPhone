@@ -1,5 +1,5 @@
 <?php
-// Controller BCE: HoSoKhachHangCtrl (UC43 - UC47)
+// Controller BCE: HoSoKhachHangCtrl (UC43 - UC47) — Phụ lục B.1 Lan03
 
 class HoSoKhachHangCtrl
 {
@@ -10,42 +10,35 @@ class HoSoKhachHangCtrl
         $this->pdo = $pdo;
     }
 
+    // UC43: layHoSo(maKhachHang)
     public function layHoSo(int $maKhachHang): array
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT kh.*, tk.dinhDanh, tk.vaiTro, tk.trangThai
-             FROM KhachHang kh
-             JOIN TaiKhoan tk ON tk.maTaiKhoan = kh.maTaiKhoan
-             WHERE kh.maKhachHang = ? LIMIT 1"
-        );
-        $stmt->execute([$maKhachHang]);
-        $row = $stmt->fetch();
-
+        $row = KhachHang::timTheoMa($maKhachHang, $this->pdo);
         if (!$row) {
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy hồ sơ khách hàng', 'duLieu' => null, 'maHttp' => 404];
         }
-
         $hoSo = KhachHang::tuMang($row)->chuyenThanhMang();
         $hoSo['dinhDanh'] = $row['dinhDanh'];
         $hoSo['vaiTro'] = $row['vaiTro'];
         $hoSo['trangThai'] = $row['trangThai'];
-
         return ['thanhCong' => true, 'thongBao' => 'Lấy hồ sơ khách hàng thành công', 'duLieu' => $hoSo];
     }
 
+    // UC44: capNhatHoSo(maKhachHang, hoTen, soDienThoai, email)
     public function capNhatHoSo(int $maKhachHang, array $duLieu): array
     {
         $hoTen = trim((string)($duLieu['hoTen'] ?? ''));
-        $soDienThoai = isset($duLieu['soDienThoai']) ? trim((string)$duLieu['soDienThoai']) : null;
-        $email = isset($duLieu['email']) ? trim((string)$duLieu['email']) : null;
+        $soDienThoai = isset($duLieu['soDienThoai']) && trim((string)$duLieu['soDienThoai']) !== '' ? trim((string)$duLieu['soDienThoai']) : null;
+        $email = isset($duLieu['email']) && trim((string)$duLieu['email']) !== '' ? trim((string)$duLieu['email']) : null;
 
-        if ($hoTen === '') {
-            return ['thanhCong' => false, 'thongBao' => 'Họ tên không được để trống', 'duLieu' => null, 'maHttp' => 400];
+        if (!KhachHang::kiemTraHopLe($hoTen, $soDienThoai, $email)) {
+            return ['thanhCong' => false, 'thongBao' => 'Họ tên hoặc định dạng email không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        }
+        if (TaiKhoan::kiemTraTrungThongTin($maKhachHang, $soDienThoai, $email, $this->pdo)) {
+            return ['thanhCong' => false, 'thongBao' => 'Số điện thoại hoặc email đã được sử dụng bởi khách hàng khác', 'duLieu' => null, 'maHttp' => 409];
         }
 
-        $this->pdo->prepare("UPDATE KhachHang SET hoTen = ?, soDienThoai = ?, email = ? WHERE maKhachHang = ?")
-            ->execute([$hoTen, $soDienThoai, $email, $maKhachHang]);
-
+        KhachHang::capNhat($maKhachHang, $hoTen, $soDienThoai, $email, $this->pdo);
         return $this->layHoSo($maKhachHang);
     }
 
@@ -54,41 +47,34 @@ class HoSoKhachHangCtrl
         if (strlen($matKhauMoi) < 6) {
             return ['thanhCong' => false, 'thongBao' => 'Mật khẩu mới phải có ít nhất 6 ký tự', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $stmt = $this->pdo->prepare("SELECT matKhauDaBam FROM TaiKhoan WHERE maTaiKhoan = ? LIMIT 1");
-        $stmt->execute([$maTaiKhoan]);
-        $bamCu = $stmt->fetchColumn();
-
-        if (!$bamCu || !password_verify($matKhauCu, (string)$bamCu)) {
+        $tkInfo = TaiKhoan::timTheoMa($maTaiKhoan, $this->pdo);
+        if (!$tkInfo || !TaiKhoan::kiemTraMatKhau($tkInfo['dinhDanh'], $matKhauCu, $this->pdo)) {
             return ['thanhCong' => false, 'thongBao' => 'Mật khẩu hiện tại không chính xác', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $this->pdo->prepare("UPDATE TaiKhoan SET matKhauDaBam = ? WHERE maTaiKhoan = ?")
-            ->execute([password_hash($matKhauMoi, PASSWORD_BCRYPT), $maTaiKhoan]);
-
+        TaiKhoan::capNhatMatKhau($maTaiKhoan, password_hash($matKhauMoi, PASSWORD_BCRYPT), $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Đổi mật khẩu thành công', 'duLieu' => null];
     }
 
+    // UC45: layDanhSachDiaChi(maKhachHang), layDiaChi(maDiaChi), capNhatDiaChi(...), themDiaChiGiaoHang(...), xoaDiaChiGiaoHang(...)
     public function layDanhSachDiaChi(int $maKhachHang): array
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT dc.*, qt.khuVuc, qt.mucPhi
-             FROM DiaChiGiaoHang dc
-             JOIN QuyTacPhiVanChuyen qt ON qt.maQuyTac = dc.maQuyTac
-             WHERE dc.maKhachHang = ?
-             ORDER BY dc.macDinh DESC, dc.maDiaChi DESC"
-        );
-        $stmt->execute([$maKhachHang]);
-
         $ketQua = [];
-        foreach ($stmt->fetchAll() as $dong) {
+        foreach (DiaChiGiaoHang::timTheoKhachHang($maKhachHang, $this->pdo) as $dong) {
             $muc = DiaChiGiaoHang::tuMang($dong)->chuyenThanhMang();
             $muc['khuVuc'] = $dong['khuVuc'];
             $muc['mucPhi'] = (float)$dong['mucPhi'];
             $ketQua[] = $muc;
         }
-
         return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách địa chỉ giao hàng thành công', 'duLieu' => $ketQua];
+    }
+
+    public function layDiaChi(int $maDiaChi, int $maKhachHang): array
+    {
+        $dc = DiaChiGiaoHang::timTheoMa($maDiaChi, $this->pdo);
+        if (!$dc || (int)$dc['maKhachHang'] !== $maKhachHang) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy địa chỉ giao hàng', 'duLieu' => null, 'maHttp' => 404];
+        }
+        return ['thanhCong' => true, 'thongBao' => 'Lấy địa chỉ giao hàng thành công', 'duLieu' => $dc];
     }
 
     public function themDiaChiGiaoHang(int $maKhachHang, array $duLieu): array
@@ -97,85 +83,43 @@ class HoSoKhachHangCtrl
         $soDienThoai = trim((string)($duLieu['soDienThoai'] ?? ''));
         $diaChi = trim((string)($duLieu['diaChi'] ?? ''));
         $maQuyTac = (int)($duLieu['maQuyTac'] ?? 1);
-        $macDinh = (bool)($duLieu['macDinh'] ?? false);
+        $macDinh = !empty($duLieu['macDinh']);
 
-        if ($nguoiNhan === '' || $soDienThoai === '' || $diaChi === '') {
+        if (!DiaChiGiaoHang::kiemTraHopLe($nguoiNhan, $soDienThoai, $diaChi, $maQuyTac)) {
             return ['thanhCong' => false, 'thongBao' => 'Vui lòng nhập đầy đủ người nhận, số điện thoại và địa chỉ', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        if ($macDinh) {
-            $this->pdo->prepare("UPDATE DiaChiGiaoHang SET macDinh = FALSE WHERE maKhachHang = ?")->execute([$maKhachHang]);
-        }
-
-        $this->pdo->prepare(
-            "INSERT INTO DiaChiGiaoHang (maKhachHang, nguoiNhan, soDienThoai, diaChi, maQuyTac, macDinh)
-             VALUES (?, ?, ?, ?, ?, ?)"
-        )->execute([$maKhachHang, $nguoiNhan, $soDienThoai, $diaChi, $maQuyTac, $macDinh ? 1 : 0]);
-
-        return ['thanhCong' => true, 'thongBao' => 'Thêm địa chỉ giao hàng thành công', 'duLieu' => ['maDiaChi' => (int)$this->pdo->lastInsertId()], 'maHttp' => 201];
+        $maDiaChi = DiaChiGiaoHang::luu($maKhachHang, $nguoiNhan, $soDienThoai, $diaChi, $maQuyTac, $macDinh, $this->pdo);
+        return ['thanhCong' => true, 'thongBao' => 'Thêm địa chỉ giao hàng thành công', 'duLieu' => ['maDiaChi' => $maDiaChi], 'maHttp' => 201];
     }
 
-    public function capNhatDiaChiGiaoHang(int $maKhachHang, int $maDiaChi, array $duLieu): array
+    public function capNhatDiaChi(int $maKhachHang, int $maDiaChi, array $duLieu): array
     {
-        $macDinh = (bool)($duLieu['macDinh'] ?? false);
-        if ($macDinh) {
-            $this->pdo->prepare("UPDATE DiaChiGiaoHang SET macDinh = FALSE WHERE maKhachHang = ?")->execute([$maKhachHang]);
+        $dc = DiaChiGiaoHang::timTheoMa($maDiaChi, $this->pdo);
+        if (!$dc || (int)$dc['maKhachHang'] !== $maKhachHang) {
+            return ['thanhCong' => false, 'thongBao' => 'Địa chỉ không tồn tại hoặc không thuộc quyền sở hữu của bạn', 'duLieu' => null, 'maHttp' => 403];
         }
-        $this->pdo->prepare(
-            "UPDATE DiaChiGiaoHang
-             SET nguoiNhan = COALESCE(?, nguoiNhan),
-                 soDienThoai = COALESCE(?, soDienThoai),
-                 diaChi = COALESCE(?, diaChi),
-                 maQuyTac = COALESCE(?, maQuyTac),
-                 macDinh = ?
-             WHERE maDiaChi = ? AND maKhachHang = ?"
-        )->execute([
-            $duLieu['nguoiNhan'] ?? null,
-            $duLieu['soDienThoai'] ?? null,
-            $duLieu['diaChi'] ?? null,
-            isset($duLieu['maQuyTac']) ? (int)$duLieu['maQuyTac'] : null,
-            $macDinh ? 1 : 0,
-            $maDiaChi,
-            $maKhachHang,
-        ]);
+        DiaChiGiaoHang::capNhat($maDiaChi, $maKhachHang, $duLieu, $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Cập nhật địa chỉ giao hàng thành công', 'duLieu' => ['maDiaChi' => $maDiaChi]];
     }
 
     public function xoaDiaChiGiaoHang(int $maKhachHang, int $maDiaChi): array
     {
         try {
-            $this->pdo->prepare("DELETE FROM DiaChiGiaoHang WHERE maDiaChi = ? AND maKhachHang = ?")->execute([$maDiaChi, $maKhachHang]);
+            if (!DiaChiGiaoHang::xoa($maDiaChi, $maKhachHang, $this->pdo)) {
+                return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy địa chỉ thuộc quyền sở hữu của bạn', 'duLieu' => null, 'maHttp' => 404];
+            }
             return ['thanhCong' => true, 'thongBao' => 'Xóa địa chỉ giao hàng thành công', 'duLieu' => ['maDiaChi' => $maDiaChi]];
         } catch (Throwable $ngoaiLe) {
             return ['thanhCong' => false, 'thongBao' => 'Không thể xóa địa chỉ đang được sử dụng trong đơn hàng', 'duLieu' => null, 'maHttp' => 409];
         }
     }
 
-    public function layLichSuDonHang(int $maKhachHang): array
+    // UC46: layLichSuMuaHang(maKhachHang) & layChiTietDonHang(maDonHang)
+    public function layLichSuMuaHang(int $maKhachHang): array
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT dh.*, tt.phuongThuc, tt.trangThai AS trangThaiThanhToan,
-                    dc.nguoiNhan, dc.soDienThoai, dc.diaChi AS diaChiGiaoHang,
-                    (SELECT yc.trangThai FROM YeuCauHuyDon yc WHERE yc.maDonHang = dh.maDonHang ORDER BY yc.maYeuCau DESC LIMIT 1) AS trangThaiYeuCauHuy
-             FROM DonHang dh
-             LEFT JOIN ThanhToan tt ON tt.maDonHang = dh.maDonHang
-             LEFT JOIN DiaChiGiaoHang dc ON dc.maDiaChi = dh.maDiaChi
-             WHERE dh.maKhachHang = ?
-             ORDER BY dh.ngayDat DESC"
-        );
-        $stmt->execute([$maKhachHang]);
-        $dsDon = $stmt->fetchAll();
-
-        $ctStmt = $this->pdo->prepare(
-            "SELECT ct.*, d.ten AS tenDienThoai, d.hinhAnh
-             FROM ChiTietDonHang ct
-             JOIN DonHang dh ON dh.maDonHang = ct.maDonHang
-             LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai
-             WHERE dh.maKhachHang = ?"
-        );
-        $ctStmt->execute([$maKhachHang]);
+        $dsDon = DonHang::timTheoKhachHang($maKhachHang, $this->pdo);
         $ctTheoDon = [];
-        foreach ($ctStmt->fetchAll() as $ct) {
+        foreach (ChiTietDonHang::timTheoDonHang(null, $maKhachHang, $this->pdo) as $ct) {
             $ma = (int)$ct['maDonHang'];
             $muc = ChiTietDonHang::tuMang($ct)->chuyenThanhMang();
             $muc['tenDienThoai'] = $ct['tenDienThoai'] ?? '';
@@ -196,50 +140,27 @@ class HoSoKhachHangCtrl
             $ketQua[] = $muc;
         }
 
-        return ['thanhCong' => true, 'thongBao' => 'Lấy lịch sử đơn hàng thành công', 'duLieu' => $ketQua];
+        return ['thanhCong' => true, 'thongBao' => 'Lấy lịch sử mua hàng thành công', 'duLieu' => $ketQua];
     }
 
-    public function layThongBao(int $maTaiKhoan): array
+    public function layChiTietDonHang(int $maDonHang, ?int $maKhachHangKiemTra = null): array
     {
-        $stmt = $this->pdo->prepare("SELECT * FROM ThongBao WHERE maNguoiNhan = ? ORDER BY thoiDiemTao DESC LIMIT 50");
-        $stmt->execute([$maTaiKhoan]);
-        $ketQua = array_map(fn($d) => ThongBao::tuMang($d)->chuyenThanhMang(), $stmt->fetchAll());
-        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách thông báo thành công', 'duLieu' => $ketQua];
-    }
-
-    public function danhDauDaDocThongBao(int $maTaiKhoan, ?int $maThongBao = null): array
-    {
-        if ($maThongBao !== null && $maThongBao > 0) {
-            $this->pdo->prepare("UPDATE ThongBao SET daDoc = TRUE WHERE maThongBao = ? AND maNguoiNhan = ?")
-                ->execute([$maThongBao, $maTaiKhoan]);
-        } else {
-            $this->pdo->prepare("UPDATE ThongBao SET daDoc = TRUE WHERE maNguoiNhan = ?")->execute([$maTaiKhoan]);
+        $dh = DonHang::timTheoMa($maDonHang, false, $this->pdo);
+        if (!$dh) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy đơn hàng', 'duLieu' => null, 'maHttp' => 404];
         }
-        return ['thanhCong' => true, 'thongBao' => 'Đã đánh dấu thông báo đã đọc', 'duLieu' => null];
+        if ($maKhachHangKiemTra !== null && (int)$dh['maKhachHang'] !== $maKhachHangKiemTra) {
+            return ['thanhCong' => false, 'thongBao' => 'Bạn không có quyền xem đơn hàng của người khác', 'duLieu' => null, 'maHttp' => 403];
+        }
+        $dh['chiTiet'] = ChiTietDonHang::timTheoDonHang($maDonHang, null, $this->pdo);
+        return ['thanhCong' => true, 'thongBao' => 'Lấy chi tiết đơn hàng thành công', 'duLieu' => $dh];
     }
 
-    // UC47: Nhân viên Bán hàng / CSKH tra cứu thông tin & lịch sử mua của khách hàng (chỉ xem)
-    public function traCuuKhachHang(?string $tuKhoa = null): array
+    // UC47: timKhachHang(tuKhoa) — Nhân viên Bán hàng / CSKH tra cứu chỉ xem
+    public function timKhachHang(?string $tuKhoa = null): array
     {
-        $sql = "SELECT kh.*, tk.dinhDanh, tk.trangThai,
-                       COUNT(dh.maDonHang) AS tongSoDon,
-                       COALESCE(SUM(CASE WHEN dh.trangThai <> 'Đã hủy' THEN dh.tongTien ELSE 0 END), 0) AS tongChiTieu
-                FROM KhachHang kh
-                JOIN TaiKhoan tk ON tk.maTaiKhoan = kh.maTaiKhoan
-                LEFT JOIN DonHang dh ON dh.maKhachHang = kh.maKhachHang";
-        $thamSo = [];
-        $tu = trim((string)$tuKhoa);
-        if ($tu !== '') {
-            $sql .= " WHERE kh.hoTen LIKE ? OR kh.soDienThoai LIKE ? OR kh.email LIKE ?";
-            $mau = '%' . $tu . '%';
-            $thamSo = [$mau, $mau, $mau];
-        }
-        $sql .= " GROUP BY kh.maKhachHang ORDER BY kh.maKhachHang DESC";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($thamSo);
         $ketQua = [];
-        foreach ($stmt->fetchAll() as $dong) {
+        foreach (KhachHang::timTheoTuKhoa($tuKhoa, $this->pdo) as $dong) {
             $muc = KhachHang::tuMang($dong)->chuyenThanhMang();
             $muc['dinhDanh'] = $dong['dinhDanh'];
             $muc['trangThai'] = $dong['trangThai'];
@@ -248,5 +169,16 @@ class HoSoKhachHangCtrl
             $ketQua[] = $muc;
         }
         return ['thanhCong' => true, 'thongBao' => 'Tra cứu danh sách khách hàng thành công', 'duLieu' => $ketQua];
+    }
+
+    public function layThongBao(int $maTaiKhoan): array
+    {
+        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách thông báo thành công', 'duLieu' => ThongBao::timTheoNguoiNhan($maTaiKhoan, $this->pdo)];
+    }
+
+    public function danhDauDaDocThongBao(int $maTaiKhoan, ?int $maThongBao = null): array
+    {
+        ThongBao::danhDauDaDoc($maTaiKhoan, $maThongBao, $this->pdo);
+        return ['thanhCong' => true, 'thongBao' => 'Đã đánh dấu thông báo đã đọc', 'duLieu' => null];
     }
 }

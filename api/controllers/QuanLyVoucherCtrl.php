@@ -1,5 +1,5 @@
 <?php
-// Controller BCE: QuanLyVoucherCtrl (UC60 - UC64)
+// Controller BCE: QuanLyVoucherCtrl (UC60 - UC64) — Phụ lục B.1 Lan03
 
 class QuanLyVoucherCtrl
 {
@@ -12,26 +12,31 @@ class QuanLyVoucherCtrl
 
     public function layDanhSachVoucher(): array
     {
-        $sql = "SELECT v.*, dk.giaTriToiThieu, dk.nhomHang, dk.doiTuong
-                FROM Voucher v
-                LEFT JOIN DieuKienApDung dk ON dk.maVoucher = v.maVoucher
-                ORDER BY v.ngayBatDau DESC";
-
-        $ketQua = [];
-        foreach ($this->pdo->query($sql)->fetchAll() as $dong) {
-            $muc = Voucher::tuMang($dong)->chuyenThanhMang();
-            $muc['dieuKienApDung'] = [
-                'giaTriToiThieu' => (float)($dong['giaTriToiThieu'] ?? 0),
-                'nhomHang'       => $dong['nhomHang'] ?? null,
-                'doiTuong'       => $dong['doiTuong'] ?? null,
-            ];
-            $ketQua[] = $muc;
-        }
-
-        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách voucher thành công', 'duLieu' => $ketQua];
+        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách voucher thành công', 'duLieu' => Voucher::timTatCa(null, $this->pdo)];
     }
 
-    public function taoVoucher(array $duLieu): array
+    // UC61: locVoucher(trangThai) & layChiTietVoucher(maVoucher)
+    public function locVoucher(?string $trangThai = null): array
+    {
+        return ['thanhCong' => true, 'thongBao' => 'Tra cứu danh sách voucher thành công', 'duLieu' => Voucher::timTatCa($trangThai, $this->pdo)];
+    }
+
+    public function layChiTietVoucher(string $maVoucher): array
+    {
+        $v = Voucher::timTheoMa($maVoucher, $this->pdo);
+        if (!$v) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy mã voucher', 'duLieu' => null, 'maHttp' => 404];
+        }
+        return ['thanhCong' => true, 'thongBao' => 'Lấy chi tiết voucher thành công', 'duLieu' => $v];
+    }
+
+    public function layThongTinVoucher(string $maVoucher): array
+    {
+        return $this->layChiTietVoucher($maVoucher);
+    }
+
+    // UC60: luuVoucher(maVoucher, loaiGiam, giaTriGiam, soLuong, gioiHanSuDung, thoiGian, dieuKien)
+    public function luuVoucher(array $duLieu): array
     {
         $maVoucher = strtoupper(trim((string)($duLieu['maVoucher'] ?? '')));
         $loaiGiam = trim((string)($duLieu['loaiGiam'] ?? 'Số tiền'));
@@ -41,62 +46,77 @@ class QuanLyVoucherCtrl
         $ngayBatDau = trim((string)($duLieu['ngayBatDau'] ?? date('Y-m-d')));
         $ngayKetThuc = trim((string)($duLieu['ngayKetThuc'] ?? date('Y-m-d', strtotime('+30 days'))));
 
-        if ($maVoucher === '' || !in_array($loaiGiam, ['Phần trăm', 'Số tiền'], true) || $giaTriGiam <= 0 || $soLuong <= 0 || $ngayKetThuc < $ngayBatDau) {
-            return ['thanhCong' => false, 'thongBao' => 'Thông tin voucher không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        if ($maVoucher === '' || !Voucher::kiemTraHopLe($giaTriGiam, $soLuong, $gioiHanSuDung, $loaiGiam, $ngayBatDau, $ngayKetThuc)) {
+            return ['thanhCong' => false, 'thongBao' => 'Thông tin voucher không hợp lệ (kiểm tra loại giảm, giá trị, số lượng và ngày hiệu lực)', 'duLieu' => null, 'maHttp' => 400];
+        }
+        if (Voucher::kiemTraTrungMa($maVoucher, $this->pdo)) {
+            return ['thanhCong' => false, 'thongBao' => 'Mã voucher đã tồn tại trong hệ thống', 'duLieu' => null, 'maHttp' => 409];
         }
 
+        $dk = is_array($duLieu['dieuKienApDung'] ?? null) ? $duLieu['dieuKienApDung'] : $duLieu;
+
         try {
-            $this->pdo->beginTransaction();
+            batDauGiaoDich($this->pdo);
+            Voucher::luu($maVoucher, $loaiGiam, $giaTriGiam, $soLuong, $gioiHanSuDung, $ngayBatDau, $ngayKetThuc, $this->pdo);
+            DieuKienApDung::lienKet($maVoucher, $dk, $this->pdo);
+            xacNhanGiaoDich($this->pdo);
 
-            $this->pdo->prepare(
-                "INSERT INTO Voucher (maVoucher, loaiGiam, giaTriGiam, soLuong, gioiHanSuDung, luotDaDung, ngayBatDau, ngayKetThuc, trangThai)
-                 VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'Đang hiệu lực')"
-            )->execute([$maVoucher, $loaiGiam, $giaTriGiam, $soLuong, max(1, $gioiHanSuDung), $ngayBatDau, $ngayKetThuc]);
-
-            $dk = is_array($duLieu['dieuKienApDung'] ?? null) ? $duLieu['dieuKienApDung'] : $duLieu;
-            $this->pdo->prepare(
-                "INSERT INTO DieuKienApDung (maKhuyenMai, maVoucher, giaTriToiThieu, nhomHang, doiTuong)
-                 VALUES (NULL, ?, ?, ?, ?)"
-            )->execute([$maVoucher, max(0, (float)($dk['giaTriToiThieu'] ?? 0)), $dk['nhomHang'] ?? 'Tất cả', $dk['doiTuong'] ?? 'Khách hàng đã đăng nhập']);
-
-            $this->pdo->commit();
             return ['thanhCong' => true, 'thongBao' => 'Tạo mã voucher thành công', 'duLieu' => ['maVoucher' => $maVoucher], 'maHttp' => 201];
         } catch (Throwable $ngoaiLe) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['thanhCong' => false, 'thongBao' => 'Không thể tạo voucher (có thể mã đã tồn tại): ' . $ngoaiLe->getMessage(), 'duLieu' => null, 'maHttp' => 409];
+            hoanTacGiaoDich($this->pdo);
+            error_log('luuVoucher: ' . $ngoaiLe->getMessage());
+            return ['thanhCong' => false, 'thongBao' => 'Không thể tạo mã voucher', 'duLieu' => null, 'maHttp' => 500];
         }
     }
 
+    // UC62: capNhatVoucher(...)
     public function capNhatVoucher(string $maVoucher, array $duLieu): array
     {
         $maVoucher = strtoupper(trim($maVoucher));
-        $stmt = $this->pdo->prepare("SELECT * FROM Voucher WHERE maVoucher = ? LIMIT 1");
-        $stmt->execute([$maVoucher]);
-        $v = $stmt->fetch();
+        $v = Voucher::timTheoMa($maVoucher, $this->pdo);
         if (!$v) {
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy mã voucher', 'duLieu' => null, 'maHttp' => 404];
         }
 
+        $loaiGiam = trim((string)($duLieu['loaiGiam'] ?? $v['loaiGiam']));
+        $giaTriGiam = (float)($duLieu['giaTriGiam'] ?? $v['giaTriGiam']);
         $soLuong = (int)($duLieu['soLuong'] ?? $v['soLuong']);
+        $gioiHanSuDung = max(1, (int)($duLieu['gioiHanSuDung'] ?? $v['gioiHanSuDung']));
+        $ngayBatDau = trim((string)($duLieu['ngayBatDau'] ?? $v['ngayBatDau']));
+        $ngayKetThuc = trim((string)($duLieu['ngayKetThuc'] ?? $v['ngayKetThuc']));
+
         if ($soLuong < (int)$v['luotDaDung']) {
-            return ['thanhCong' => false, 'thongBao' => 'Số lượng phát hành không được nhỏ hơn số lượt đã dùng', 'duLieu' => null, 'maHttp' => 400];
+            return ['thanhCong' => false, 'thongBao' => 'Số lượng phát hành không được nhỏ hơn số lượt đã sử dụng', 'duLieu' => null, 'maHttp' => 400];
+        }
+        if (!Voucher::kiemTraHopLe($giaTriGiam, $soLuong, $gioiHanSuDung, $loaiGiam, $ngayBatDau, $ngayKetThuc)) {
+            return ['thanhCong' => false, 'thongBao' => 'Thông tin cập nhật voucher không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
         }
 
-        $this->pdo->prepare(
-            "UPDATE Voucher SET loaiGiam = ?, giaTriGiam = ?, soLuong = ?, gioiHanSuDung = ?, ngayBatDau = ?, ngayKetThuc = ? WHERE maVoucher = ?"
-        )->execute([
-            $duLieu['loaiGiam'] ?? $v['loaiGiam'],
-            (float)($duLieu['giaTriGiam'] ?? $v['giaTriGiam']),
-            $soLuong,
-            max(1, (int)($duLieu['gioiHanSuDung'] ?? $v['gioiHanSuDung'])),
-            $duLieu['ngayBatDau'] ?? $v['ngayBatDau'],
-            $duLieu['ngayKetThuc'] ?? $v['ngayKetThuc'],
-            $maVoucher,
-        ]);
+        $dk = is_array($duLieu['dieuKienApDung'] ?? null) ? $duLieu['dieuKienApDung'] : $duLieu;
 
-        return ['thanhCong' => true, 'thongBao' => 'Cập nhật voucher thành công', 'duLieu' => ['maVoucher' => $maVoucher]];
+        try {
+            batDauGiaoDich($this->pdo);
+            Voucher::capNhat($maVoucher, $loaiGiam, $giaTriGiam, $soLuong, $gioiHanSuDung, $ngayBatDau, $ngayKetThuc, $this->pdo);
+            DieuKienApDung::lienKet($maVoucher, $dk, $this->pdo);
+            xacNhanGiaoDich($this->pdo);
+
+            return ['thanhCong' => true, 'thongBao' => 'Cập nhật mã voucher thành công', 'duLieu' => ['maVoucher' => $maVoucher]];
+        } catch (Throwable $ngoaiLe) {
+            hoanTacGiaoDich($this->pdo);
+            error_log('capNhatVoucher: ' . $ngoaiLe->getMessage());
+            return ['thanhCong' => false, 'thongBao' => 'Không thể cập nhật mã voucher', 'duLieu' => null, 'maHttp' => 500];
+        }
+    }
+
+    // UC63: khoaVoucher(maVoucher)
+    public function khoaVoucher(string $maVoucher): array
+    {
+        return $this->capNhatTrangThaiVoucher($maVoucher, 'Đã khóa');
+    }
+
+    public function moKhoaVoucher(string $maVoucher): array
+    {
+        return $this->capNhatTrangThaiVoucher($maVoucher, 'Đang hiệu lực');
     }
 
     public function capNhatTrangThaiVoucher(string $maVoucher, string $trangThai): array
@@ -105,24 +125,18 @@ class QuanLyVoucherCtrl
         if (!in_array($trangThai, ['Đang hiệu lực', 'Hết hạn', 'Đã khóa'], true)) {
             return ['thanhCong' => false, 'thongBao' => 'Trạng thái voucher không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $this->pdo->prepare("UPDATE Voucher SET trangThai = ? WHERE maVoucher = ?")->execute([$trangThai, $maVoucher]);
+        Voucher::capNhatTrangThai($maVoucher, $trangThai, $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Cập nhật trạng thái voucher thành công', 'duLieu' => ['maVoucher' => $maVoucher, 'trangThai' => $trangThai]];
     }
 
+    // UC64: xoaVoucher(maVoucher)
     public function xoaVoucher(string $maVoucher): array
     {
         $maVoucher = strtoupper(trim($maVoucher));
-        $stmt = $this->pdo->prepare("SELECT luotDaDung FROM Voucher WHERE maVoucher = ? LIMIT 1");
-        $stmt->execute([$maVoucher]);
-        $row = $stmt->fetch();
-
-        if (!$row) {
+        if (!Voucher::timTheoMa($maVoucher, $this->pdo)) {
             return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy mã voucher', 'duLieu' => null, 'maHttp' => 404];
         }
-
-        // UC64: Chỉ cho phép xóa khi luotDaDung == 0; nếu > 0 phải dùng UC63 (Khóa voucher)
-        if ((int)$row['luotDaDung'] > 0) {
+        if (Voucher::demLuotSuDung($maVoucher, $this->pdo) > 0) {
             return [
                 'thanhCong' => false,
                 'thongBao'  => 'Voucher đã phát sinh lượt sử dụng (> 0), không được xóa — vui lòng chọn chức năng Khóa voucher (UC63)',
@@ -132,16 +146,15 @@ class QuanLyVoucherCtrl
         }
 
         try {
-            $this->pdo->beginTransaction();
-            $this->pdo->prepare("DELETE FROM DieuKienApDung WHERE maVoucher = ?")->execute([$maVoucher]);
-            $this->pdo->prepare("DELETE FROM Voucher WHERE maVoucher = ?")->execute([$maVoucher]);
-            $this->pdo->commit();
+            batDauGiaoDich($this->pdo);
+            DieuKienApDung::xoaTheoVoucher($maVoucher, $this->pdo);
+            Voucher::xoa($maVoucher, $this->pdo);
+            xacNhanGiaoDich($this->pdo);
             return ['thanhCong' => true, 'thongBao' => 'Đã xóa mã voucher chưa sử dụng thành công', 'duLieu' => ['maVoucher' => $maVoucher]];
         } catch (Throwable $ngoaiLe) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['thanhCong' => false, 'thongBao' => 'Không thể xóa voucher: ' . $ngoaiLe->getMessage(), 'duLieu' => null, 'maHttp' => 409];
+            hoanTacGiaoDich($this->pdo);
+            error_log('xoaVoucher: ' . $ngoaiLe->getMessage());
+            return ['thanhCong' => false, 'thongBao' => 'Không thể xóa mã voucher', 'duLieu' => null, 'maHttp' => 409];
         }
     }
 }

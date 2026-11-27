@@ -1,5 +1,5 @@
 <?php
-// Controller BCE: QuanLyDanhMucCtrl (UC1 - UC3)
+// Controller BCE: QuanLyDanhMucCtrl (UC1 - UC3) — Phụ lục B.1 Lan03
 
 class QuanLyDanhMucCtrl
 {
@@ -12,78 +12,72 @@ class QuanLyDanhMucCtrl
 
     public function layDanhSachDanhMuc(): array
     {
-        $cauLenh = $this->pdo->query("SELECT maDanhMuc, ten, moTa FROM DanhMuc ORDER BY maDanhMuc ASC");
-        $ketQua = [];
-        foreach ($cauLenh->fetchAll() as $dong) {
-            $ketQua[] = DanhMuc::tuMang($dong)->chuyenThanhMang();
-        }
-        return ['thanhCong' => true, 'thongBao' => 'Lấy danh sách danh mục thành công', 'duLieu' => $ketQua];
+        return [
+            'thanhCong' => true,
+            'thongBao'  => 'Lấy danh sách danh mục thành công',
+            'duLieu'    => DanhMuc::timTatCa($this->pdo),
+        ];
     }
 
-    public function themDanhMuc(array $duLieu): array
+    public function layThongTinDanhMuc(int $maDanhMuc): array
+    {
+        $dm = DanhMuc::timTheoMa($maDanhMuc, $this->pdo);
+        if (!$dm) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy danh mục', 'duLieu' => null, 'maHttp' => 404];
+        }
+        return ['thanhCong' => true, 'thongBao' => 'Lấy thông tin danh mục thành công', 'duLieu' => $dm->chuyenThanhMang()];
+    }
+
+    // UC1: luuDanhMuc(ten, moTa)
+    public function luuDanhMuc(array $duLieu): array
     {
         $ten = trim((string)($duLieu['ten'] ?? ''));
         $moTa = isset($duLieu['moTa']) ? trim((string)$duLieu['moTa']) : null;
 
-        if ($ten === '') {
-            return ['thanhCong' => false, 'thongBao' => 'Tên danh mục không được để trống', 'duLieu' => null, 'maHttp' => 400];
+        if (!DanhMuc::kiemTraHopLe($ten)) {
+            return ['thanhCong' => false, 'thongBao' => 'Tên danh mục không hợp lệ hoặc để trống', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $kiemTra = $this->pdo->prepare("SELECT maDanhMuc FROM DanhMuc WHERE ten = ? LIMIT 1");
-        $kiemTra->execute([$ten]);
-        if ($kiemTra->fetch()) {
+        if (DanhMuc::kiemTraTrungTen($ten, null, $this->pdo)) {
             return ['thanhCong' => false, 'thongBao' => 'Tên danh mục đã tồn tại trong hệ thống', 'duLieu' => null, 'maHttp' => 409];
         }
 
-        $them = $this->pdo->prepare("INSERT INTO DanhMuc (ten, moTa) VALUES (?, ?)");
-        $them->execute([$ten, $moTa]);
-
-        $danhMuc = new DanhMuc([
-            'maDanhMuc' => (int)$this->pdo->lastInsertId(),
-            'ten'       => $ten,
-            'moTa'      => $moTa,
-        ]);
-
-        return ['thanhCong' => true, 'thongBao' => 'Thêm danh mục thành công', 'duLieu' => $danhMuc->chuyenThanhMang(), 'maHttp' => 201];
+        $maMoi = DanhMuc::luu($ten, $moTa, $this->pdo);
+        $dm = new DanhMuc(['maDanhMuc' => $maMoi, 'ten' => $ten, 'moTa' => $moTa]);
+        return ['thanhCong' => true, 'thongBao' => 'Thêm danh mục thành công', 'duLieu' => $dm->chuyenThanhMang(), 'maHttp' => 201];
     }
 
+    // UC2: capNhatDanhMuc(maDanhMuc, ten, moTa)
     public function capNhatDanhMuc(int $maDanhMuc, array $duLieu): array
     {
         $ten = trim((string)($duLieu['ten'] ?? ''));
         $moTa = isset($duLieu['moTa']) ? trim((string)$duLieu['moTa']) : null;
 
-        if ($maDanhMuc <= 0 || $ten === '') {
-            return ['thanhCong' => false, 'thongBao' => 'Mã danh mục và tên danh mục không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
+        if ($maDanhMuc <= 0 || !DanhMuc::kiemTraHopLe($ten)) {
+            return ['thanhCong' => false, 'thongBao' => 'Mã danh mục hoặc tên danh mục không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $kiemTraTrung = $this->pdo->prepare("SELECT maDanhMuc FROM DanhMuc WHERE ten = ? AND maDanhMuc <> ? LIMIT 1");
-        $kiemTraTrung->execute([$ten, $maDanhMuc]);
-        if ($kiemTraTrung->fetch()) {
+        if (!DanhMuc::kiemTraTonTai($maDanhMuc, $this->pdo)) {
+            return ['thanhCong' => false, 'thongBao' => 'Không tìm thấy danh mục cần cập nhật', 'duLieu' => null, 'maHttp' => 404];
+        }
+        if (DanhMuc::kiemTraTrungTen($ten, $maDanhMuc, $this->pdo)) {
             return ['thanhCong' => false, 'thongBao' => 'Tên danh mục đã trùng với danh mục khác', 'duLieu' => null, 'maHttp' => 409];
         }
 
-        $capNhat = $this->pdo->prepare("UPDATE DanhMuc SET ten = ?, moTa = ? WHERE maDanhMuc = ?");
-        $capNhat->execute([$ten, $moTa, $maDanhMuc]);
-
-        $danhMuc = new DanhMuc(['maDanhMuc' => $maDanhMuc, 'ten' => $ten, 'moTa' => $moTa]);
-        return ['thanhCong' => true, 'thongBao' => 'Cập nhật danh mục thành công', 'duLieu' => $danhMuc->chuyenThanhMang()];
+        DanhMuc::capNhat($maDanhMuc, $ten, $moTa, $this->pdo);
+        $dm = new DanhMuc(['maDanhMuc' => $maDanhMuc, 'ten' => $ten, 'moTa' => $moTa]);
+        return ['thanhCong' => true, 'thongBao' => 'Cập nhật danh mục thành công', 'duLieu' => $dm->chuyenThanhMang()];
     }
 
+    // UC3: xoaDanhMuc(maDanhMuc)
     public function xoaDanhMuc(int $maDanhMuc): array
     {
         if ($maDanhMuc <= 0) {
             return ['thanhCong' => false, 'thongBao' => 'Mã danh mục không hợp lệ', 'duLieu' => null, 'maHttp' => 400];
         }
-
-        $demSanPham = $this->pdo->prepare("SELECT COUNT(*) FROM DienThoai WHERE maDanhMuc = ?");
-        $demSanPham->execute([$maDanhMuc]);
-        if ((int)$demSanPham->fetchColumn() > 0) {
+        if (DienThoai::demDienThoaiTheoDanhMuc($maDanhMuc, $this->pdo) > 0) {
             return ['thanhCong' => false, 'thongBao' => 'Không thể xóa danh mục đang có điện thoại thuộc danh mục này', 'duLieu' => null, 'maHttp' => 409];
         }
 
-        $xoa = $this->pdo->prepare("DELETE FROM DanhMuc WHERE maDanhMuc = ?");
-        $xoa->execute([$maDanhMuc]);
-
+        DanhMuc::xoa($maDanhMuc, $this->pdo);
         return ['thanhCong' => true, 'thongBao' => 'Xóa danh mục thành công', 'duLieu' => ['maDanhMuc' => $maDanhMuc]];
     }
 }

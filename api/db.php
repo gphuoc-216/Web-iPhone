@@ -40,7 +40,8 @@ function layKetNoiCsdl(bool $tuDongBaoLoi = false): ?PDO
             ]);
         } catch (Throwable $ngoaiLe) {
             $ketNoiPdo = null;
-            $loiCsdl   = $ngoaiLe->getMessage();
+            $loiCsdl   = 'Không thể kết nối CSDL';
+            error_log('Ket noi CSDL that bai: ' . $ngoaiLe->getMessage());
         }
     }
 
@@ -157,4 +158,28 @@ function chuanHoaDuongDanAnh(?string $duongDan): string
         return '/storage/shop-assets/' . $sach;
     }
     return '/storage/shop-assets/img/' . $sach;
+}
+
+/**
+ * Các hàm hỗ trợ quản lý Transaction CSDL để tầng Controller không gọi trực tiếp hàm SQL/PDO.
+ */
+function batDauGiaoDich(PDO $pdo): void
+{
+    if (!$pdo->inTransaction()) {
+        $pdo->beginTransaction();
+    }
+}
+
+function xacNhanGiaoDich(PDO $pdo): void
+{
+    if ($pdo->inTransaction()) {
+        $pdo->commit();
+    }
+}
+
+function hoanTacGiaoDich(PDO $pdo): void
+{
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
 }

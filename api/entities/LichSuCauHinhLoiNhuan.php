@@ -1,17 +1,17 @@
 <?php
-// Entity BCE: LichSuCauHinhLoiNhuan (Bảng LichSuCauHinhLoiNhuan)
+// Entity BCE: LichSuCauHinhLoiNhuan — Bảng LichSuCauHinhLoiNhuan
 
 class LichSuCauHinhLoiNhuan
 {
     public const TEN_BANG = 'LichSuCauHinhLoiNhuan';
     public const KHOA_CHINH = 'maLichSu';
 
-    public ?int $maLichSu = null;
-    public ?int $maCauHinh = null;
-    public string $phamVi = '';
-    public float $tyLe = 0.0;
-    public ?string $ngayApDung = null;
-    public ?string $thoiDiemGhi = null;
+    private ?int $maLichSu = null;
+    private ?int $maCauHinh = null;
+    private string $phamVi = '';
+    private float $tyLe = 0.0;
+    private ?string $ngayApDung = null;
+    private ?string $thoiDiemGhi = null;
 
     public function __construct(array $duLieu = [])
     {
@@ -35,6 +35,26 @@ class LichSuCauHinhLoiNhuan
         }
     }
 
+    public function __get(string $tenThuocTinh)
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            return $this->$tenThuocTinh;
+        }
+        return null;
+    }
+
+    public function __set(string $tenThuocTinh, $giaTri): void
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            $this->$tenThuocTinh = $giaTri;
+        }
+    }
+
+    public function __isset(string $tenThuocTinh): bool
+    {
+        return property_exists($this, $tenThuocTinh) && $this->$tenThuocTinh !== null;
+    }
+
     public static function tuMang(array $duLieu): self
     {
         return new self($duLieu);
@@ -51,4 +71,25 @@ class LichSuCauHinhLoiNhuan
             'thoiDiemGhi' => $this->thoiDiemGhi,
         ];
     }
+
+    protected static function pdo(?PDO $pdo = null): PDO
+    {
+        return $pdo ?? layKetNoiCsdl(true);
+    }
+
+    public static function ghiLichSu(int $maCauHinh, string $phamVi, float $tyLe, string $ngayApDung, ?PDO $pdo = null): bool
+    {
+        $stmt = self::pdo($pdo)->prepare(
+            "INSERT INTO LichSuCauHinhLoiNhuan (maCauHinh, phamVi, tyLe, ngayApDung, thoiDiemGhi)
+             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
+        );
+        return $stmt->execute([$maCauHinh, $phamVi, $tyLe, $ngayApDung]);
+    }
+
+    public static function timTatCa(?PDO $pdo = null): array
+    {
+        $rows = self::pdo($pdo)->query("SELECT * FROM LichSuCauHinhLoiNhuan ORDER BY thoiDiemGhi DESC LIMIT 50")->fetchAll();
+        return array_map(fn($r) => self::tuMang($r)->chuyenThanhMang(), $rows);
+    }
+
 }

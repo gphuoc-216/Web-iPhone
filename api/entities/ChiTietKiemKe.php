@@ -1,17 +1,17 @@
 <?php
-// Entity BCE: ChiTietKiemKe (Bảng ChiTietKiemKe)
+// Entity BCE: ChiTietKiemKe — Bảng ChiTietKiemKe
 
 class ChiTietKiemKe
 {
     public const TEN_BANG = 'ChiTietKiemKe';
     public const KHOA_CHINH = 'maChiTiet';
 
-    public ?int $maChiTiet = null;
-    public ?int $maBienBan = null;
-    public ?int $maDienThoai = null;
-    public int $soLuongHeThong = 0;
-    public int $soLuongThucTe = 0;
-    public int $chenhLech = 0;
+    private ?int $maChiTiet = null;
+    private ?int $maBienBan = null;
+    private ?int $maDienThoai = null;
+    private int $soLuongHeThong = 0;
+    private int $soLuongThucTe = 0;
+    private int $chenhLech = 0;
 
     public function __construct(array $duLieu = [])
     {
@@ -35,6 +35,26 @@ class ChiTietKiemKe
         }
     }
 
+    public function __get(string $tenThuocTinh)
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            return $this->$tenThuocTinh;
+        }
+        return null;
+    }
+
+    public function __set(string $tenThuocTinh, $giaTri): void
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            $this->$tenThuocTinh = $giaTri;
+        }
+    }
+
+    public function __isset(string $tenThuocTinh): bool
+    {
+        return property_exists($this, $tenThuocTinh) && $this->$tenThuocTinh !== null;
+    }
+
     public static function tuMang(array $duLieu): self
     {
         return new self($duLieu);
@@ -51,9 +71,51 @@ class ChiTietKiemKe
             'chenhLech' => $this->chenhLech,
         ];
     }
-    public function tinhChenhLech(): int
+
+    protected static function pdo(?PDO $pdo = null): PDO
     {
-        $this->chenhLech = $this->soLuongThucTe - $this->soLuongHeThong;
-        return $this->chenhLech;
+        return $pdo ?? layKetNoiCsdl(true);
     }
+
+    public static function kiemTraHopLe(array $danhSachSoLuong): bool
+    {
+        if (empty($danhSachSoLuong)) return false;
+        foreach ($danhSachSoLuong as $d) {
+            if ((int)($d['maDienThoai'] ?? 0) <= 0 || !isset($d['soLuongThucTe']) || (int)$d['soLuongThucTe'] < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static function tinhChenhLech(int $maDienThoai, int $soLuongThucTe, int $maKho = 1, ?PDO $pdo = null): array
+    {
+        $ton = TonKho::timTheoDienThoai($maDienThoai, $maKho, false, $pdo);
+        $heThong = $ton ? (int)$ton['tonThucTe'] : 0;
+        return [
+            'soLuongHeThong' => $heThong,
+            'soLuongThucTe'  => $soLuongThucTe,
+            'chenhLech'      => $soLuongThucTe - $heThong,
+        ];
+    }
+
+    public static function luu(int $maBienBan, int $maDienThoai, int $soLuongHeThong, int $soLuongThucTe, int $chenhLech, ?PDO $pdo = null): int
+    {
+        $db = self::pdo($pdo);
+        $db->prepare("INSERT INTO ChiTietKiemKe (maBienBan, maDienThoai, soLuongHeThong, soLuongThucTe, chenhLech) VALUES (?, ?, ?, ?, ?)")
+           ->execute([$maBienBan, $maDienThoai, $soLuongHeThong, $soLuongThucTe, $chenhLech]);
+        return (int)$db->lastInsertId();
+    }
+
+    public static function timTheoBienBan(?int $maBienBan = null, ?PDO $pdo = null): array
+    {
+        $db = self::pdo($pdo);
+        if ($maBienBan !== null) {
+            $stmt = $db->prepare("SELECT ct.*, d.ten AS tenDienThoai FROM ChiTietKiemKe ct LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai WHERE ct.maBienBan = ?");
+            $stmt->execute([$maBienBan]);
+            return $stmt->fetchAll();
+        }
+        return $db->query("SELECT ct.*, d.ten AS tenDienThoai FROM ChiTietKiemKe ct LEFT JOIN DienThoai d ON d.maDienThoai = ct.maDienThoai")->fetchAll();
+    }
+
 }

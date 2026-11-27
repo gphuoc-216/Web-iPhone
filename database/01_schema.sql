@@ -498,7 +498,6 @@ CREATE TABLE PhieuXuat (
   ghiChu      TEXT,
   trangThai   VARCHAR(30) NOT NULL DEFAULT 'Nháp',
   maNhanVien  INT NOT NULL,
-  CONSTRAINT uq_PhieuXuat_DonHang UNIQUE (maDonHang),
   CONSTRAINT fk_PhieuXuat_DonHang
     FOREIGN KEY (maDonHang) REFERENCES DonHang(maDonHang)
     ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -506,6 +505,7 @@ CREATE TABLE PhieuXuat (
     FOREIGN KEY (maNhanVien) REFERENCES NhanVien(maNhanVien)
     ON UPDATE CASCADE ON DELETE RESTRICT,
   CONSTRAINT chk_PhieuXuat_trangThai CHECK (trangThai IN ('Nháp', 'Đã xuất', 'Đã hủy')),
+  INDEX idx_PhieuXuat_DonHang (maDonHang),
   INDEX idx_PhieuXuat_ngayLap (ngayLap)
 ) ENGINE=InnoDB;
 

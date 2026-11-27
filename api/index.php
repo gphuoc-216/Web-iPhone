@@ -97,11 +97,14 @@ try {
         case 'danh-muc':
             $ctrl = new QuanLyDanhMucCtrl($pdo);
             if ($phuongThuc === 'GET') {
+                if (!empty($_GET['maDanhMuc'])) {
+                    traKetQuaController($ctrl->layThongTinDanhMuc((int)$_GET['maDanhMuc']));
+                }
                 traKetQuaController($ctrl->layDanhSachDanhMuc());
             }
             yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
             if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->themDanhMuc($duLieu));
+                traKetQuaController($ctrl->luuDanhMuc($duLieu));
             }
             if ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH') {
                 traKetQuaController($ctrl->capNhatDanhMuc((int)($duLieu['maDanhMuc'] ?? $_GET['maDanhMuc'] ?? 0), $duLieu));
@@ -111,10 +114,17 @@ try {
             }
             break;
 
-        // 2. QuanLyDienThoaiCtrl (UC4 - UC6, UC10) — Ban Quản lý
+        // 2. QuanLyDienThoaiCtrl (UC4 - UC6, UC10) — Bảo vệ dữ liệu nội bộ (giaVonBinhQuan, Ngừng kinh doanh)
         case 'dien-thoai':
             $ctrl = new QuanLyDienThoaiCtrl($pdo);
             if ($phuongThuc === 'GET') {
+                yeuCauPhanQuyen($pdo, ['Ban Quản lý', 'Nhân viên Kho', 'Nhân viên Bán hàng / CSKH'], $duLieu);
+                if ($hanhDong === 'ngung-kinh-doanh') {
+                    traKetQuaController($ctrl->layDanhSachNgungKinhDoanh());
+                }
+                if (!empty($_GET['maDienThoai'])) {
+                    traKetQuaController($ctrl->layThongTinDienThoai((int)$_GET['maDienThoai']));
+                }
                 traKetQuaController($ctrl->layDanhSachDienThoai($_GET['trangThai'] ?? null));
             }
             yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
@@ -122,11 +132,11 @@ try {
                 traKetQuaController($ctrl->khoiPhucDienThoai((int)($duLieu['maDienThoai'] ?? 0)));
             }
             $tepAnh = $_FILES['hinhAnh'] ?? $_FILES['anh'] ?? null;
-            if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->themDienThoai($duLieu, $tepAnh));
-            }
-            if ($phuongThuc === 'PUT') {
+            if (($hanhDong === 'cap-nhat' && $phuongThuc === 'POST') || $phuongThuc === 'PUT') {
                 traKetQuaController($ctrl->capNhatDienThoai((int)($duLieu['maDienThoai'] ?? $_GET['maDienThoai'] ?? 0), $duLieu, $tepAnh));
+            }
+            if ($phuongThuc === 'POST') {
+                traKetQuaController($ctrl->luuDienThoai($duLieu, $tepAnh));
             }
             if ($phuongThuc === 'PATCH') {
                 traKetQuaController($ctrl->capNhatTrangThaiDienThoai((int)($duLieu['maDienThoai'] ?? 0), (string)($duLieu['trangThai'] ?? '')));
@@ -136,13 +146,18 @@ try {
             }
             break;
 
-        // 3. TimKiemSanPhamCtrl (UC7 - UC9) — Công khai
+        // 3. TimKiemSanPhamCtrl (UC7 - UC9) — Công khai (không lộ giaVonBinhQuan)
         case 'tim-kiem':
             $ctrl = new TimKiemSanPhamCtrl($pdo);
             if ($hanhDong === 'chi-tiet' || !empty($_GET['maDienThoai'])) {
-                traKetQuaController($ctrl->xemChiTietDienThoai((int)($_GET['maDienThoai'] ?? 0)));
+                traKetQuaController($ctrl->layChiTietSanPham((int)($_GET['maDienThoai'] ?? 0)));
             }
-            traKetQuaController($ctrl->timKiemVaLocDienThoai($_GET));
+            $boLoc = $_GET;
+            unset($boLoc['duongDan'], $boLoc['taiNguyen'], $boLoc['hanhDong']);
+            if (empty($boLoc)) {
+                traKetQuaController($ctrl->layDanhSachSanPham());
+            }
+            traKetQuaController($ctrl->locSanPham($boLoc));
             break;
 
         // 4. ChinhSachGiaCtrl (UC11) — Ban Quản lý
@@ -153,7 +168,7 @@ try {
                 traKetQuaController($ctrl->layCauHinhLoiNhuan());
             }
             if ($phuongThuc === 'POST' || $phuongThuc === 'PUT') {
-                traKetQuaController($ctrl->capNhatChinhSachLoiNhuan($duLieu));
+                traKetQuaController($ctrl->luuCauHinhLoiNhuan($duLieu));
             }
             break;
 
@@ -162,7 +177,16 @@ try {
             $ctrl = new PhieuNhapCtrl($pdo);
             if ($phuongThuc === 'GET') {
                 yeuCauPhanQuyen($pdo, ['Nhân viên Kho', 'Ban Quản lý'], $duLieu);
-                traKetQuaController($ctrl->layDanhSachPhieuNhap($_GET['trangThai'] ?? null));
+                if (!empty($_GET['maPhieuNhap'])) {
+                    traKetQuaController($ctrl->layChiTietPhieuNhap((int)$_GET['maPhieuNhap']));
+                }
+                if ($hanhDong === 'cho-duyet') {
+                    traKetQuaController($ctrl->layDanhSachPhieuChoDuyet());
+                }
+                if (!empty($_GET['trangThai']) || !empty($_GET['tuNgay']) || !empty($_GET['denNgay'])) {
+                    traKetQuaController($ctrl->locPhieuNhap($_GET['trangThai'] ?? null, $_GET['tuNgay'] ?? null, $_GET['denNgay'] ?? null));
+                }
+                traKetQuaController($ctrl->layDanhSachPhieuNhap());
             }
             if ($phuongThuc === 'POST' && $hanhDong === 'duyet') {
                 yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
@@ -178,15 +202,21 @@ try {
             }
             if ($phuongThuc === 'POST') {
                 $phien = yeuCauPhanQuyen($pdo, ['Nhân viên Kho'], $duLieu);
-                traKetQuaController($ctrl->taoPhieuNhap($duLieu, (int)($phien['maNhanVien'] ?? 0)));
+                traKetQuaController($ctrl->luuPhieuNhap($duLieu, (int)($phien['maNhanVien'] ?? 0)));
             }
             break;
 
-        // 6. PhieuXuatCtrl (UC15 - UC17) — DUY NHẤT Nhân viên Kho lập/xác nhận/hủy
+        // 6. PhieuXuatCtrl (UC15 - UC17) — Nhân viên Kho lập/xác nhận/hủy
         case 'phieu-xuat':
             $ctrl = new PhieuXuatCtrl($pdo);
             if ($phuongThuc === 'GET') {
                 yeuCauPhanQuyen($pdo, ['Nhân viên Kho', 'Ban Quản lý', 'Nhân viên Bán hàng / CSKH'], $duLieu);
+                if (!empty($_GET['maPhieuXuat'])) {
+                    traKetQuaController($ctrl->layChiTietPhieuXuat((int)$_GET['maPhieuXuat']));
+                }
+                if (!empty($_GET['trangThai']) || !empty($_GET['tuNgay']) || !empty($_GET['denNgay'])) {
+                    traKetQuaController($ctrl->locPhieuXuat($_GET['trangThai'] ?? null, $_GET['tuNgay'] ?? null, $_GET['denNgay'] ?? null));
+                }
                 traKetQuaController($ctrl->layDanhSachPhieuXuat());
             }
             $phien = yeuCauPhanQuyen($pdo, ['Nhân viên Kho'], $duLieu);
@@ -197,7 +227,7 @@ try {
                 traKetQuaController($ctrl->huyPhieuXuat((int)($duLieu['maPhieuXuat'] ?? 0)));
             }
             if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->taoPhieuXuatTuDonHang((int)($duLieu['maDonHang'] ?? 0), (int)($phien['maNhanVien'] ?? 0), $duLieu['ghiChu'] ?? null));
+                traKetQuaController($ctrl->luuPhieuXuat((int)($duLieu['maDonHang'] ?? 0), (int)($phien['maNhanVien'] ?? 0), $duLieu['ghiChu'] ?? null));
             }
             break;
 
@@ -206,23 +236,39 @@ try {
             $ctrl = new KiemKeCtrl($pdo);
             if ($hanhDong === 'canh-bao' && $phuongThuc === 'GET') {
                 yeuCauPhanQuyen($pdo, ['Nhân viên Kho', 'Ban Quản lý'], $duLieu);
-                traKetQuaController($ctrl->layCanhBaoTonKho());
+                traKetQuaController($ctrl->layDanhSachCanhBao($_GET['loaiCanhBao'] ?? null));
+            }
+            if ($hanhDong === 'nguong-canh-bao' && $phuongThuc === 'GET') {
+                yeuCauPhanQuyen($pdo, ['Nhân viên Kho', 'Ban Quản lý'], $duLieu);
+                traKetQuaController($ctrl->layDanhSachNguong());
             }
             if ($hanhDong === 'nguong-canh-bao' && ($phuongThuc === 'POST' || $phuongThuc === 'PUT')) {
                 yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
-                traKetQuaController($ctrl->capNhatNguongCanhBao($duLieu));
+                traKetQuaController($ctrl->luuNguongTonKho($duLieu));
+            }
+            if ($hanhDong === 'tu-choi' && $phuongThuc === 'POST') {
+                yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
+                traKetQuaController($ctrl->tuChoiBienBan((int)($duLieu['maBienBan'] ?? 0), $duLieu['lyDo'] ?? null));
             }
             if ($hanhDong === 'duyet' && $phuongThuc === 'POST') {
                 yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
-                traKetQuaController($ctrl->duyetBienBanKiemKe((int)($duLieu['maBienBan'] ?? 0), (bool)($duLieu['pheDuyet'] ?? true), $duLieu['lyDo'] ?? null));
+                $pheDuyet = array_key_exists('pheDuyet', $duLieu) ? (bool)$duLieu['pheDuyet'] : true;
+                if ($pheDuyet) {
+                    traKetQuaController($ctrl->duyetBienBan((int)($duLieu['maBienBan'] ?? 0)));
+                } else {
+                    traKetQuaController($ctrl->tuChoiBienBan((int)($duLieu['maBienBan'] ?? 0), $duLieu['lyDo'] ?? null));
+                }
             }
             if ($phuongThuc === 'GET') {
                 yeuCauPhanQuyen($pdo, ['Nhân viên Kho', 'Ban Quản lý'], $duLieu);
-                traKetQuaController($ctrl->layDanhSachBienBan());
+                if (!empty($_GET['maBienBan'])) {
+                    traKetQuaController($ctrl->layChiTietBienBan((int)$_GET['maBienBan']));
+                }
+                traKetQuaController($ctrl->layDanhSachBienBanKiemKe());
             }
             if ($phuongThuc === 'POST') {
                 $phien = yeuCauPhanQuyen($pdo, ['Nhân viên Kho'], $duLieu);
-                traKetQuaController($ctrl->taoBienBanKiemKe($duLieu, (int)($phien['maNhanVien'] ?? 0)));
+                traKetQuaController($ctrl->hoanTatKiemKe($duLieu, (int)($phien['maNhanVien'] ?? 0)));
             }
             break;
 
@@ -251,7 +297,7 @@ try {
         case 'phi-van-chuyen':
             $ctrl = new DatHangCtrl($pdo);
             if ($phuongThuc === 'GET') {
-                traKetQuaController($ctrl->layDanhSachQuyTacPhi());
+                traKetQuaController($ctrl->layQuyTacPhi());
             }
             yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
             if ($phuongThuc === 'POST' || $phuongThuc === 'PUT') {
@@ -272,26 +318,23 @@ try {
                 $phien = yeuCauPhanQuyen($pdo, ['Khách hàng'], $duLieu);
                 traKetQuaController($ctrl->thanhToan((int)($phien['maKhachHang'] ?? 0), $duLieu));
             }
-            if ($hanhDong === 'xac-nhan-thanh-toan' && $phuongThuc === 'POST') {
-                yeuCauPhanQuyen($pdo, ['Khách hàng', 'Nhân viên Bán hàng / CSKH'], $duLieu);
-                traKetQuaController($ctrl->xacNhanThanhToanTrucTuyen((int)($duLieu['maDonHang'] ?? 0), (bool)($duLieu['thanhCong'] ?? true)));
-            }
             $phien = yeuCauPhanQuyen($pdo, ['Khách hàng'], $duLieu);
             if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->datHang((int)($phien['maKhachHang'] ?? 0), $duLieu));
+                traKetQuaController($ctrl->xacNhanDatHang((int)($phien['maKhachHang'] ?? 0), $duLieu, layMaPhienTuYeuCau($duLieu)));
             }
             break;
 
-        // 10. ApDungVoucherCtrl (UC30)
+        // 10. ApDungVoucherCtrl (UC30) — Có đối chiếu quyền sở hữu giỏ hàng chống IDOR
         case 'ap-dung-voucher':
             $ctrl = new ApDungVoucherCtrl($pdo);
-            $phien = (new XacThucCtrl($pdo))->kiemTraPhien(layMaPhienTuYeuCau($duLieu));
+            $maPhien = layMaPhienTuYeuCau($duLieu);
+            $phien = (new XacThucCtrl($pdo))->kiemTraPhien($maPhien);
             $maKhachHang = $phien['maKhachHang'] ?? null;
             if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->apDungVoucher((int)($duLieu['maGioHang'] ?? 0), (string)($duLieu['maVoucher'] ?? ''), $maKhachHang));
+                traKetQuaController($ctrl->apDungVoucher((int)($duLieu['maGioHang'] ?? 0), (string)($duLieu['maVoucher'] ?? ''), $maKhachHang, $maPhien));
             }
             if ($phuongThuc === 'DELETE') {
-                traKetQuaController($ctrl->goBoVoucher((int)($_GET['maGioHang'] ?? $duLieu['maGioHang'] ?? 0)));
+                traKetQuaController($ctrl->boApDungVoucher((int)($_GET['maGioHang'] ?? $duLieu['maGioHang'] ?? 0), $maKhachHang, $maPhien));
             }
             break;
 
@@ -303,18 +346,32 @@ try {
                 traKetQuaController($ctrl->tuHuyDonHang((int)($duLieu['maDonHang'] ?? 0), (int)($phien['maKhachHang'] ?? 0), (string)($duLieu['lyDo'] ?? '')));
             }
             if ($phuongThuc === 'POST' && ($hanhDong === '' || $hanhDong === 'gui-yeu-cau')) {
-                yeuCauPhanQuyen($pdo, ['Khách hàng'], $duLieu);
-                traKetQuaController($ctrl->guiYeuCauHuyDon((int)($duLieu['maDonHang'] ?? 0), (string)($duLieu['lyDo'] ?? '')));
+                $phien = yeuCauPhanQuyen($pdo, ['Khách hàng'], $duLieu);
+                traKetQuaController($ctrl->guiYeuCauHuy((int)($duLieu['maDonHang'] ?? 0), (string)($duLieu['lyDo'] ?? ''), (int)($phien['maKhachHang'] ?? 0)));
             }
             yeuCauPhanQuyen($pdo, ['Nhân viên Bán hàng / CSKH'], $duLieu);
             if ($phuongThuc === 'GET') {
                 traKetQuaController($ctrl->layDanhSachYeuCauHuy());
             }
+            if ($phuongThuc === 'POST' && $hanhDong === 'xac-nhan') {
+                traKetQuaController($ctrl->xacNhanHuyDon((int)($duLieu['maYeuCau'] ?? 0)));
+            }
+            if ($phuongThuc === 'POST' && $hanhDong === 'tu-choi') {
+                traKetQuaController($ctrl->tuChoiYeuCauHuy((int)($duLieu['maYeuCau'] ?? 0), $duLieu['lyDo'] ?? $duLieu['lyDoTuChoi'] ?? null));
+            }
             if ($phuongThuc === 'POST' && $hanhDong === 'xu-ly') {
-                traKetQuaController($ctrl->xuLyYeuCauHuyDon((int)($duLieu['maYeuCau'] ?? 0), (bool)($duLieu['chapNhan'] ?? true), $duLieu['lyDoTuChoi'] ?? null));
+                $chapNhan = array_key_exists('chapNhan', $duLieu) ? (bool)$duLieu['chapNhan'] : true;
+                if ($chapNhan) {
+                    traKetQuaController($ctrl->xacNhanHuyDon((int)($duLieu['maYeuCau'] ?? 0)));
+                } else {
+                    traKetQuaController($ctrl->tuChoiYeuCauHuy((int)($duLieu['maYeuCau'] ?? 0), $duLieu['lyDoTuChoi'] ?? $duLieu['lyDo'] ?? null));
+                }
             }
             if ($phuongThuc === 'POST' && $hanhDong === 'hoan-tien') {
-                traKetQuaController($ctrl->xuLyHoanTien((int)($duLieu['maDonHang'] ?? 0), (bool)($duLieu['hoanThanhCong'] ?? true)));
+                $soTienHoan = (isset($duLieu['soTienHoan']) && $duLieu['soTienHoan'] !== '') ? (float)$duLieu['soTienHoan'] : null;
+                $lyDo = isset($duLieu['lyDo']) ? (string)$duLieu['lyDo'] : null;
+                $hoanThanhCong = array_key_exists('hoanThanhCong', $duLieu) ? (bool)$duLieu['hoanThanhCong'] : true;
+                traKetQuaController($ctrl->hoanTien((int)($duLieu['maDonHang'] ?? 0), $soTienHoan, $lyDo, $hoanThanhCong));
             }
             break;
 
@@ -326,8 +383,15 @@ try {
                 traKetQuaController($ctrl->layDanhSachDonHang($_GET['trangThai'] ?? null));
             }
             yeuCauPhanQuyen($pdo, ['Nhân viên Bán hàng / CSKH'], $duLieu);
+            if ($hanhDong === 'duyet' && ($phuongThuc === 'POST' || $phuongThuc === 'PATCH')) {
+                traKetQuaController($ctrl->duyetDonHang((int)($duLieu['maDonHang'] ?? 0)));
+            }
             if ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH') {
-                traKetQuaController($ctrl->capNhatTrangThaiDonHang((int)($duLieu['maDonHang'] ?? 0), (string)($duLieu['trangThai'] ?? '')));
+                $trangThaiMoi = (string)($duLieu['trangThai'] ?? '');
+                if ($trangThaiMoi === 'Đã duyệt') {
+                    traKetQuaController($ctrl->duyetDonHang((int)($duLieu['maDonHang'] ?? 0)));
+                }
+                traKetQuaController($ctrl->capNhatTienDo((int)($duLieu['maDonHang'] ?? 0), $trangThaiMoi));
             }
             break;
 
@@ -351,10 +415,15 @@ try {
                 phanHoiJson(true, 'Phiên đăng nhập còn hiệu lực', $phien);
             }
             if ($hanhDong === 'quen-mat-khau' && $phuongThuc === 'POST') {
-                traKetQuaController($ctrl->yeuCauKhoiPhucMatKhau((string)($duLieu['dinhDanh'] ?? '')));
+                traKetQuaController($ctrl->guiMaXacThuc((string)($duLieu['dinhDanh'] ?? '')));
             }
             if ($hanhDong === 'dat-lai-mat-khau' && $phuongThuc === 'POST') {
-                traKetQuaController($ctrl->datLaiMatKhau((string)($duLieu['dinhDanh'] ?? ''), (string)($duLieu['maXacThuc'] ?? ''), (string)($duLieu['matKhauMoi'] ?? '')));
+                traKetQuaController($ctrl->datLaiMatKhau(
+                    (string)($duLieu['dinhDanh'] ?? ''),
+                    (string)($duLieu['maXacThuc'] ?? ''),
+                    (string)($duLieu['matKhauMoi'] ?? ''),
+                    isset($duLieu['xacNhanMatKhau']) ? (string)$duLieu['xacNhanMatKhau'] : null
+                ));
             }
             break;
 
@@ -375,10 +444,10 @@ try {
             yeuCauPhanQuyen($pdo, ['Nhân viên Bán hàng / CSKH', 'Ban Quản lý'], $duLieu);
             $ctrl = new HoSoKhachHangCtrl($pdo);
             if ($phuongThuc === 'GET' && $hanhDong === 'lich-su') {
-                traKetQuaController($ctrl->layLichSuDonHang((int)($_GET['maKhachHang'] ?? 0)));
+                traKetQuaController($ctrl->layLichSuMuaHang((int)($_GET['maKhachHang'] ?? 0)));
             }
             if ($phuongThuc === 'GET') {
-                traKetQuaController($ctrl->traCuuKhachHang($_GET['tuKhoa'] ?? null));
+                traKetQuaController($ctrl->timKhachHang($_GET['tuKhoa'] ?? null));
             }
             break;
 
@@ -394,13 +463,13 @@ try {
                 traKetQuaController($ctrl->themDiaChiGiaoHang($maKhachHang, $duLieu));
             }
             if ($hanhDong === 'dia-chi' && ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH')) {
-                traKetQuaController($ctrl->capNhatDiaChiGiaoHang($maKhachHang, (int)($duLieu['maDiaChi'] ?? 0), $duLieu));
+                traKetQuaController($ctrl->capNhatDiaChi($maKhachHang, (int)($duLieu['maDiaChi'] ?? 0), $duLieu));
             }
             if ($hanhDong === 'dia-chi' && $phuongThuc === 'DELETE') {
                 traKetQuaController($ctrl->xoaDiaChiGiaoHang($maKhachHang, (int)($_GET['maDiaChi'] ?? $duLieu['maDiaChi'] ?? 0)));
             }
             if ($hanhDong === 'don-hang' && $phuongThuc === 'GET') {
-                traKetQuaController($ctrl->layLichSuDonHang($maKhachHang));
+                traKetQuaController($ctrl->layLichSuMuaHang($maKhachHang));
             }
             if ($hanhDong === 'thong-bao' && $phuongThuc === 'GET') {
                 traKetQuaController($ctrl->layThongBao((int)$phien['maTaiKhoan']));
@@ -421,16 +490,27 @@ try {
             $phien = yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
             $ctrl = new QuanLyTaiKhoanCtrl($pdo);
             if ($phuongThuc === 'GET') {
+                if (!empty($_GET['tuKhoa'])) {
+                    traKetQuaController($ctrl->timKiemTaiKhoan((string)$_GET['tuKhoa']));
+                }
                 traKetQuaController($ctrl->layDanhSachTaiKhoan());
             }
-            if ($phuongThuc === 'POST') {
+            if ($phuongThuc === 'POST' && $hanhDong === '') {
                 traKetQuaController($ctrl->taoTaiKhoanNhanVien($duLieu));
             }
-            if ($hanhDong === 'vai-tro' && ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH')) {
-                traKetQuaController($ctrl->capNhatVaiTro((int)($duLieu['maTaiKhoan'] ?? 0), (string)($duLieu['vaiTro'] ?? '')));
+            if (($hanhDong === 'nhan-vien' || $hanhDong === 'vai-tro') && ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH')) {
+                traKetQuaController($ctrl->capNhatNhanVien((int)($duLieu['maTaiKhoan'] ?? 0), $duLieu));
             }
-            if ($hanhDong === 'khoa' && ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH')) {
-                traKetQuaController($ctrl->khoaHoacMoKhoaTaiKhoan((int)($duLieu['maTaiKhoan'] ?? 0), (bool)($duLieu['khoa'] ?? true), $duLieu['lyDoKhoa'] ?? null, (int)$phien['maTaiKhoan']));
+            if ($hanhDong === 'mo-khoa' && ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH' || $phuongThuc === 'POST')) {
+                traKetQuaController($ctrl->moKhoaTaiKhoan((int)($duLieu['maTaiKhoan'] ?? 0)));
+            }
+            if ($hanhDong === 'khoa' && ($phuongThuc === 'PUT' || $phuongThuc === 'PATCH' || $phuongThuc === 'POST')) {
+                $khoa = array_key_exists('khoa', $duLieu) ? (bool)$duLieu['khoa'] : true;
+                if ($khoa) {
+                    traKetQuaController($ctrl->khoaTaiKhoan((int)($duLieu['maTaiKhoan'] ?? 0), $duLieu['lyDoKhoa'] ?? $duLieu['lyDo'] ?? null, (int)$phien['maTaiKhoan']));
+                } else {
+                    traKetQuaController($ctrl->moKhoaTaiKhoan((int)($duLieu['maTaiKhoan'] ?? 0)));
+                }
             }
             break;
 
@@ -438,16 +518,30 @@ try {
         case 'bao-cao':
             yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
             $ctrl = new ThongKeBaoCaoCtrl($pdo);
+            $tuNgay = (!empty($_GET['tuNgay'])) ? (string)$_GET['tuNgay'] : null;
+            $denNgay = (!empty($_GET['denNgay'])) ? (string)$_GET['denNgay'] : null;
+            $maDanhMuc = (!empty($_GET['maDanhMuc'])) ? (int)$_GET['maDanhMuc'] : null;
+
             if ($hanhDong === 'san-pham-ban-chay') {
-                traKetQuaController($ctrl->thongKeSanPhamBanChay((int)($_GET['gioiHan'] ?? 10)));
+                $gioiHan = (int)($_GET['gioiHan'] ?? 10);
+                if ($tuNgay || $denNgay || $maDanhMuc) {
+                    traKetQuaController($ctrl->locBaoCaoBanChay($tuNgay, $denNgay, $maDanhMuc, $gioiHan));
+                }
+                traKetQuaController($ctrl->layBaoCaoBanChay($gioiHan));
             }
             if ($hanhDong === 'don-hang') {
-                traKetQuaController($ctrl->thongKeDonHangTheoTrangThai());
+                if ($tuNgay || $denNgay) {
+                    traKetQuaController($ctrl->layBaoCaoDonHang($tuNgay, $denNgay));
+                }
+                traKetQuaController($ctrl->layBaoCaoDonHangMacDinh());
             }
             if ($hanhDong === 'ton-kho') {
-                traKetQuaController($ctrl->thongKeCanhBaoTonKho());
+                traKetQuaController($ctrl->layBaoCaoHangSapHet());
             }
-            traKetQuaController($ctrl->thongKeDoanhThuLoiNhuan($_GET['tuNgay'] ?? null, $_GET['denNgay'] ?? null));
+            if ($tuNgay || $denNgay) {
+                traKetQuaController($ctrl->layBaoCaoDoanhThu($tuNgay, $denNgay));
+            }
+            traKetQuaController($ctrl->layBaoCaoDoanhThuMacDinh());
             break;
 
         // 17. QuanLyKhuyenMaiCtrl (UC57 - UC59) — Ban Quản lý
@@ -458,7 +552,7 @@ try {
             }
             yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
             if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->taoKhuyenMai($duLieu));
+                traKetQuaController($ctrl->luuKhuyenMai($duLieu));
             }
             if ($phuongThuc === 'PUT') {
                 traKetQuaController($ctrl->capNhatKhuyenMai((int)($duLieu['maKhuyenMai'] ?? 0), $duLieu));
@@ -475,17 +569,28 @@ try {
         case 'voucher':
             $ctrl = new QuanLyVoucherCtrl($pdo);
             if ($phuongThuc === 'GET') {
+                if (!empty($_GET['trangThai'])) {
+                    traKetQuaController($ctrl->locVoucher((string)$_GET['trangThai']));
+                }
                 traKetQuaController($ctrl->layDanhSachVoucher());
             }
             yeuCauPhanQuyen($pdo, ['Ban Quản lý'], $duLieu);
             if ($phuongThuc === 'POST') {
-                traKetQuaController($ctrl->taoVoucher($duLieu));
+                traKetQuaController($ctrl->luuVoucher($duLieu));
             }
             if ($phuongThuc === 'PUT') {
                 traKetQuaController($ctrl->capNhatVoucher((string)($duLieu['maVoucher'] ?? ''), $duLieu));
             }
             if ($phuongThuc === 'PATCH') {
-                traKetQuaController($ctrl->capNhatTrangThaiVoucher((string)($duLieu['maVoucher'] ?? ''), (string)($duLieu['trangThai'] ?? 'Đã khóa')));
+                $maVc = (string)($duLieu['maVoucher'] ?? '');
+                $ttVc = (string)($duLieu['trangThai'] ?? 'Đã khóa');
+                if ($ttVc === 'Đã khóa') {
+                    traKetQuaController($ctrl->khoaVoucher($maVc));
+                }
+                if ($ttVc === 'Đang hiệu lực') {
+                    traKetQuaController($ctrl->moKhoaVoucher($maVc));
+                }
+                traKetQuaController($ctrl->capNhatTrangThaiVoucher($maVc, $ttVc));
             }
             if ($phuongThuc === 'DELETE') {
                 traKetQuaController($ctrl->xoaVoucher((string)($_GET['maVoucher'] ?? $duLieu['maVoucher'] ?? '')));
@@ -498,5 +603,6 @@ try {
 
     phanHoiJson(false, 'Phương thức HTTP không được hỗ trợ cho tài nguyên này', ['phuongThuc' => $phuongThuc, 'taiNguyen' => $taiNguyen], 405);
 } catch (Throwable $ngoaiLe) {
+    error_log('Router error: ' . $ngoaiLe->getMessage());
     phanHoiJson(false, 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau', null, 500);
 }

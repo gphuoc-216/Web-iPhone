@@ -187,17 +187,25 @@
           <div class="nhom-nhap"><label>Họ và tên</label><input id="dk-ten" required placeholder="Nguyễn Văn A" /></div>
           <div class="nhom-nhap"><label>Email hoặc Số điện thoại (định danh)</label><input id="dk-dd" required placeholder="Email hoặc SĐT" /></div>
           <div class="nhom-nhap"><label>Mật khẩu (tối thiểu 6 ký tự)</label><input id="dk-mk" type="password" minlength="6" required /></div>
+          <div class="nhom-nhap"><label>Xác nhận mật khẩu</label><input id="dk-xn-mk" type="password" minlength="6" required /></div>
           <button type="submit" class="nut nut-chinh nut-rong">Đăng ký tài khoản</button>
         </form>
       `;
       document.getElementById('f-dk').onsubmit = async (e) => {
         e.preventDefault();
+        const matKhau = document.getElementById('dk-mk').value;
+        const xacNhanMatKhau = document.getElementById('dk-xn-mk').value;
+        if (matKhau !== xacNhanMatKhau) {
+          alert('Mật khẩu xác nhận không khớp');
+          return;
+        }
         const kq = await goiApi('xac-thuc/dang-ky', {
           method: 'POST',
           body: JSON.stringify({
             hoTen: document.getElementById('dk-ten').value.trim(),
             dinhDanh: document.getElementById('dk-dd').value.trim(),
-            matKhau: document.getElementById('dk-mk').value,
+            matKhau,
+            xacNhanMatKhau,
             maPhienTam: trangThai.maPhienTam,
           }),
         });
@@ -224,6 +232,7 @@
         <div id="q-kq" class="chu-phu" style="margin:10px 0;"></div>
         <div class="nhom-nhap"><label>Mã xác thực (6 số)</label><input id="q-ma" /></div>
         <div class="nhom-nhap"><label>Mật khẩu mới</label><input id="q-mk" type="password" minlength="6" /></div>
+        <div class="nhom-nhap"><label>Xác nhận mật khẩu mới</label><input id="q-xn-mk" type="password" minlength="6" /></div>
         <button type="button" id="q-datlai" class="nut nut-chinh nut-rong">2. Đặt lại mật khẩu</button>
       `;
       document.getElementById('q-gui').onclick = async () => {
@@ -231,12 +240,19 @@
         document.getElementById('q-kq').textContent = kq.thongBao + (kq.duLieu && kq.duLieu.maXacThucMoPhong ? ` [Mã test: ${kq.duLieu.maXacThucMoPhong}]` : '');
       };
       document.getElementById('q-datlai').onclick = async () => {
+        const matKhauMoi = document.getElementById('q-mk').value;
+        const xacNhanMatKhau = document.getElementById('q-xn-mk').value;
+        if (matKhauMoi !== xacNhanMatKhau) {
+          alert('Mật khẩu xác nhận không khớp');
+          return;
+        }
         const kq = await goiApi('xac-thuc/dat-lai-mat-khau', {
           method: 'POST',
           body: JSON.stringify({
             dinhDanh: document.getElementById('q-dd').value.trim(),
             maXacThuc: document.getElementById('q-ma').value.trim(),
-            matKhauMoi: document.getElementById('q-mk').value,
+            matKhauMoi,
+            xacNhanMatKhau,
           }),
         });
         alert(kq.thongBao);

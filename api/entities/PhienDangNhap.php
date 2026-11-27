@@ -1,16 +1,16 @@
 <?php
-// Entity BCE: PhienDangNhap (Bảng PhienDangNhap)
+// Entity BCE: PhienDangNhap — Bảng PhienDangNhap
 
 class PhienDangNhap
 {
     public const TEN_BANG = 'PhienDangNhap';
     public const KHOA_CHINH = 'maPhien';
 
-    public string $maPhien = '';
-    public ?int $maTaiKhoan = null;
-    public ?string $thoiDiemTao = null;
-    public ?string $thoiDiemHetHan = null;
-    public string $trangThai = 'Còn hiệu lực';
+    private string $maPhien = '';
+    private ?int $maTaiKhoan = null;
+    private ?string $thoiDiemTao = null;
+    private ?string $thoiDiemHetHan = null;
+    private string $trangThai = 'Còn hiệu lực';
 
     public function __construct(array $duLieu = [])
     {
@@ -31,6 +31,26 @@ class PhienDangNhap
         }
     }
 
+    public function __get(string $tenThuocTinh)
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            return $this->$tenThuocTinh;
+        }
+        return null;
+    }
+
+    public function __set(string $tenThuocTinh, $giaTri): void
+    {
+        if (property_exists($this, $tenThuocTinh)) {
+            $this->$tenThuocTinh = $giaTri;
+        }
+    }
+
+    public function __isset(string $tenThuocTinh): bool
+    {
+        return property_exists($this, $tenThuocTinh) && $this->$tenThuocTinh !== null;
+    }
+
     public static function tuMang(array $duLieu): self
     {
         return new self($duLieu);
@@ -46,6 +66,12 @@ class PhienDangNhap
             'trangThai' => $this->trangThai,
         ];
     }
+
+    protected static function pdo(?PDO $pdo = null): PDO
+    {
+        return $pdo ?? layKetNoiCsdl(true);
+    }
+
     public function conHieuLuc(): bool
     {
         if ($this->trangThai !== 'Còn hiệu lực' || !$this->thoiDiemHetHan) {
@@ -53,4 +79,51 @@ class PhienDangNhap
         }
         return strtotime($this->thoiDiemHetHan) > time();
     }
+
+    public static function taoPhien(int $maTaiKhoan, ?PDO $pdo = null): array
+    {
+        $maPhien = bin2hex(random_bytes(32));
+        $thoiDiemHetHan = date('Y-m-d H:i:s', time() + 86400 * 7);
+        self::pdo($pdo)->prepare(
+            "INSERT INTO PhienDangNhap (maPhien, maTaiKhoan, thoiDiemTao, thoiDiemHetHan, trangThai)
+             VALUES (?, ?, CURRENT_TIMESTAMP, ?, 'Còn hiệu lực')"
+        )->execute([$maPhien, $maTaiKhoan, $thoiDiemHetHan]);
+        return ['maPhien' => $maPhien, 'thoiDiemHetHan' => $thoiDiemHetHan];
+    }
+
+    public static function huyPhien(string $maPhien, ?PDO $pdo = null): bool
+    {
+        if ($maPhien === '') return false;
+        return self::pdo($pdo)->prepare("UPDATE PhienDangNhap SET trangThai = 'Đã hủy' WHERE maPhien = ?")->execute([$maPhien]);
+    }
+
+    public static function huyPhienTheoTaiKhoan(int $maTaiKhoan, ?PDO $pdo = null): bool
+    {
+        return self::pdo($pdo)->prepare("UPDATE PhienDangNhap SET trangThai = 'Đã hủy' WHERE maTaiKhoan = ?")->execute([$maTaiKhoan]);
+    }
+
+    public static function kiemTraConHieuLuc(string $maPhien, ?PDO $pdo = null): bool
+    {
+        return self::layThongTinPhien($maPhien, $pdo) !== null;
+    }
+
+    public static function layThongTinPhien(string $maPhien, ?PDO $pdo = null): ?array
+    {
+        if ($maPhien === '') return null;
+        $stmt = self::pdo($pdo)->prepare(
+            "SELECT p.*, tk.dinhDanh, tk.vaiTro, tk.trangThai AS trangThaiTaiKhoan
+             FROM PhienDangNhap p
+             JOIN TaiKhoan tk ON tk.maTaiKhoan = p.maTaiKhoan
+             WHERE p.maPhien = ? LIMIT 1"
+        );
+        $stmt->execute([$maPhien]);
+        $row = $stmt->fetch();
+        if (!$row) return null;
+        $phien = self::tuMang($row);
+        if (!$phien->conHieuLuc() || $row['trangThaiTaiKhoan'] !== 'Hoạt động') {
+            return null;
+        }
+        return $row;
+    }
+
 }
